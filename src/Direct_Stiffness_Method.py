@@ -56,7 +56,7 @@ class BeamElement:
 
         # Loop through each element to build the local stiffness matrix and add it to the global matrix
         for i in range(self.nodes - 1):  # (nodes-1) beam elements
-            k_local = fu.local_stiffness_matrix(L, E, A, Iy, Iz, J)
+            k_local = fu.local_elastic_stiffness_matrix_3D_beam(L, E, A, Iy, Iz, J)
             
             # Calculate the node index for the degrees of freedom for the element
             start_dof = 6 * i
