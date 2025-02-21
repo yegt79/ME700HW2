@@ -1,7 +1,7 @@
 # tutorial.py
 
 import numpy as np
-import 
+import direct_stiffness_method as dsm
 
 # Example properties for the beam element
 E = 210e9   # Young's modulus in Pa
@@ -22,7 +22,7 @@ node_positions = [
 beam_element = BeamElement(E, A, Iy, Iz, J, nodes)
 
 # Compute the global stiffness matrix
-K_global = beam_element.stiffness_matrix(node_positions)
+K_global = beam_element.dsm(node_positions)
 
 # Display the global stiffness matrix
 print(K_global)
