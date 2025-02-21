@@ -22,7 +22,7 @@ node_positions = [
 beam_element = BeamElement(E, A, Iy, Iz, J, nodes)
 
 # Compute the global stiffness matrix
-K_global = beam_element.dsm(node_positions)
+K_global = beam_element.stiffness_matrix(node_positions)
 
 # Display the global stiffness matrix
 print(K_global)
