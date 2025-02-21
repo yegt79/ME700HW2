@@ -1,5 +1,3 @@
-# tutorial.py
-
 import numpy as np
 import Direct_Stiffness_Method as dsm
 
@@ -19,7 +17,7 @@ node_positions = [
 ]
 
 # Create a BeamElement object
-beam_element = BeamElement(E, A, Iy, Iz, J, nodes)
+beam_element = dsm.BeamElement(E, A, Iy, Iz, J, nodes)
 
 # Compute the global stiffness matrix
 K_global = beam_element.stiffness_matrix(node_positions)
