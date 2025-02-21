@@ -2,19 +2,21 @@ import numpy as np
 import functions as fu
 
 class BeamElement:
-    def __init__(self, E, A, Iy, Iz, J, nodes):
+    def __init__(self, E, nu, A, Iy, Iz, J, nodes):
         """
         Initialize the beam element with the material properties and nodes.
 
         Parameters:
         E (float): Young's Modulus
+        nu (float): Poisson's ratio
         A (float): Cross-sectional area
         Iy (float): Moment of inertia about the y-axis
         Iz (float): Moment of inertia about the z-axis
         J (float): Polar moment of inertia
-        nodes (int): Number of nodes in the beam element
+        
         """
         self.E = E
+        self.nu = nu  # New argument added here
         self.A = A
         self.Iy = Iy
         self.Iz = Iz
@@ -48,7 +50,7 @@ class BeamElement:
         L = self.length(node_positions)
 
         # Material properties
-        E, A, Iy, Iz, J = self.E, self.A, self.Iy, self.Iz, self.J
+        E, nu, A, Iy, Iz, J = self.E, self.nu, self.A, self.Iy, self.Iz, self.J
 
         # Initialize the global stiffness matrix
         num_dofs = self.nodes * 6  # 6 DOFs per node (3 translational + 3 rotational)
@@ -56,7 +58,7 @@ class BeamElement:
 
         # Loop through each element to build the local stiffness matrix and add it to the global matrix
         for i in range(self.nodes - 1):  # (nodes-1) beam elements
-            k_local = fu.local_elastic_stiffness_matrix_3D_beam(L, E, A, Iy, Iz, J)
+            k_local = fu.local_elastic_stiffness_matrix_3D_beam(E, nu, A, L, Iy, Iz, J)
             
             # Calculate the node index for the degrees of freedom for the element
             start_dof = 6 * i
