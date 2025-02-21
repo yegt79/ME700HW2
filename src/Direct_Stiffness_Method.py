@@ -1,5 +1,5 @@
 import numpy as np
-from local_stiffness_matrix import local_stiffness_matrix  # Assuming this is in a separate file
+import functions as fu
 
 class BeamElement:
     def __init__(self, E, A, Iy, Iz, J, nodes):
@@ -56,7 +56,7 @@ class BeamElement:
 
         # Loop through each element to build the local stiffness matrix and add it to the global matrix
         for i in range(self.nodes - 1):  # (nodes-1) beam elements
-            k_local = local_stiffness_matrix(L, E, A, Iy, Iz, J)
+            k_local = fu.local_stiffness_matrix(L, E, A, Iy, Iz, J)
             
             # Calculate the node index for the degrees of freedom for the element
             start_dof = 6 * i
