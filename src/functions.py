@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def local_elastic_stiffness_matrix_3D_beam(E: float, nu: float, A: float, L: float, Iy: float, Iz: float, J: float) -> np.ndarray:
     """
     local element elastic stiffness matrix
