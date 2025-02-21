@@ -1,7 +1,7 @@
 # tutorial.py
 
 import numpy as np
-import direct_stiffness_method as dsm
+import Direct_Stiffness_Method as dsm
 
 # Example properties for the beam element
 E = 210e9   # Young's modulus in Pa
