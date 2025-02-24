@@ -1,5 +1,7 @@
+# run_analysis.py
+
 import numpy as np
-import functions as fu  # Assuming functions.py is already available
+from direct_stiffness import Node, Element, Structure
 
 # Node Definitions
 node0 = Node(0, 0, 10, 0, bc=[True, True, True, True, True, True])  # Fully fixed node
@@ -24,21 +26,21 @@ element2 = Element(node1, node2, E, nu, A, 15, Iy, Iz, J)  # From node1 to node2
 
 # Add elements to structure
 elements = [element1, element2]
+nodes = [node0, node1, node2]
 
-# Create Structure
-structure = Structure(nodes=[node0, node1, node2], elements=elements)
-
-# Apply Loads (adding Force and Moment to node1's load vector)
-load_vector = np.zeros(12 * len([node0, node1, node2]))  # 12 DOFs per node
+# Create Load Vector
+load_vector = np.zeros(12 * len(nodes))  # 12 DOFs per node
 load_vector[12 * 1:12 * 1 + 3] = Force  # Apply force to node1's translation DOFs
 load_vector[12 * 1 + 3:12 * 1 + 6] = Moment  # Apply moment to node1's rotational DOFs
 
-structure.apply_loads(load_vector)
-
-# Solve for displacements and reactions
-displacements = structure.solve_for_displacements()
-reactions = structure.solve_for_reactions(displacements)
+# Calculate structure response
+node_displacements, node_reactions = calculate_structure_response(nodes, elements, load_vector)
 
 # Output results
-print("Displacements:", displacements)
-print("Reactions:", reactions)
+print("Node Displacements:")
+for node_id, displacement in node_displacements.items():
+    print(f"Node {node_id}: {displacement}")
+
+print("\nNode Reactions:")
+for node_id, reaction in node_reactions.items():
+    print(f"Node {node_id}: {reaction}")
