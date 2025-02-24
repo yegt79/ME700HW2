@@ -1,28 +1,37 @@
 # direct_stiffness.py
 
+import math
 import numpy as np
 import functions as fu  # Assuming functions.py is in the same directory
 
 class Node:
-    def __init__(self, x, y, z, node_id, bc=[False, False, False, False, False, False]):
+    def __init__(self, x, y, z, node_id, bc=None):
         self.x = x
         self.y = y
         self.z = z
         self.node_id = node_id
-        self.bc = bc  # Boundary conditions (6 values)
+        self.bc = bc if bc else [False, False, False, False, False, False]
 
 class Element:
-    def __init__(self, node1, node2, E, nu, A, L, Iy, Iz, J):
+    def __init__(self, node1, node2, E, nu, A, Iy, Iz, J):
         self.node1 = node1
         self.node2 = node2
         self.E = E
         self.nu = nu
         self.A = A
-        self.L = L
         self.Iy = Iy
         self.Iz = Iz
         self.J = J
-        self.local_stiffness_matrix = self.compute_local_stiffness_matrix()
+        self.L = self.calculate_length()
+
+    def calculate_length(self):
+        # Calculate the distance between the two nodes (Euclidean distance)
+        x1, y1, z1 = self.node1.x, self.node1.y, self.node1.z
+        x2, y2, z2 = self.node2.x, self.node2.y, self.node2.z
+        
+        # Euclidean distance formula
+        L = math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
+        return L
 
     def compute_local_stiffness_matrix(self):
         return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
