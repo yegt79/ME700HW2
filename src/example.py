@@ -1,7 +1,8 @@
 # run_analysis.py
 
+import math
 import numpy as np
-from direct_stiffness import Node, Element, Structure
+from Direct_Stiffness_Method import Node, Element, Structure, calculate_structure_response
 
 # Node Definitions
 node0 = Node(0, 0, 10, 0, bc=[True, True, True, True, True, True])  # Fully fixed node
@@ -21,8 +22,8 @@ Iz = 0.5 / 12  # Moment of Inertia about z-axis
 J = 0.02861  # Polar Moment of Inertia
 
 # Create Element
-element1 = Element(node0, node1, E, nu, A, 15, Iy, Iz, J)  # From node0 to node1
-element2 = Element(node1, node2, E, nu, A, 15, Iy, Iz, J)  # From node1 to node2
+element1 = Element(node0, node1, E, nu, A, Iy, Iz, J)  # From node0 to node1
+element2 = Element(node1, node2, E, nu, A, Iy, Iz, J)  # From node1 to node2
 
 # Add elements to structure
 elements = [element1, element2]
