@@ -1,16 +1,15 @@
+# direct_stiffness.py
+
 import numpy as np
-import functions as fu
+import functions as fu  # Assuming functions.py is in the same directory
 
 class Node:
-    def __init__(self, x, y, z, node_id, bc=None):
+    def __init__(self, x, y, z, node_id, bc=[False, False, False, False, False, False]):
         self.x = x
         self.y = y
         self.z = z
         self.node_id = node_id
-        # Boundary condition list: [Tx, Ty, Tz, Rx, Ry, Rz]
-        # Tx, Ty, Tz are translations (x, y, z)
-        # Rx, Ry, Rz are rotations (about x, y, z axes)
-        self.bc = bc if bc else [False, False, False, False, False, False]
+        self.bc = bc  # Boundary conditions (6 values)
 
 class Element:
     def __init__(self, node1, node2, E, nu, A, L, Iy, Iz, J):
@@ -27,6 +26,7 @@ class Element:
 
     def compute_local_stiffness_matrix(self):
         return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
+
 class Structure:
     def __init__(self, nodes, elements):
         self.nodes = nodes
