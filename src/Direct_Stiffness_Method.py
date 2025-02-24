@@ -1,8 +1,6 @@
-# direct_stiffness.py
-
 import math
 import numpy as np
-import functions as fu  # Assuming functions.py is in the same directory
+import functions as fu
 
 class Node:
     def __init__(self, x, y, z, node_id, bc=None):
@@ -11,6 +9,8 @@ class Node:
         self.z = z
         self.node_id = node_id
         self.bc = bc if bc else [False, False, False, False, False, False]
+        self.displacement = None  # Store displacement
+        self.reaction = None  # Store reaction
 
 class Element:
     def __init__(self, node1, node2, E, nu, A, Iy, Iz, J):
@@ -23,12 +23,12 @@ class Element:
         self.Iz = Iz
         self.J = J
         self.L = self.calculate_length()
+        self.local_stiffness_matrix = self.compute_local_stiffness_matrix()
 
     def calculate_length(self):
         # Calculate the distance between the two nodes (Euclidean distance)
         x1, y1, z1 = self.node1.x, self.node1.y, self.node1.z
         x2, y2, z2 = self.node2.x, self.node2.y, self.node2.z
-        
         # Euclidean distance formula
         L = math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
         return L
@@ -41,7 +41,7 @@ class Structure:
         self.nodes = nodes
         self.elements = elements
         self.global_stiffness_matrix = self.assemble_global_stiffness_matrix()
-        self.load_vector = np.zeros(12 * len(nodes)) 
+        self.load_vector = np.zeros(12 * len(nodes))  # 12 DOFs per node
         self.boundary_conditions = self.apply_boundary_conditions()
 
     def assemble_global_stiffness_matrix(self):
@@ -83,25 +83,63 @@ class Structure:
     def apply_loads(self, load_vector):
         self.load_vector = load_vector
 
-    def solve_for_displacements(self):
-        displacements = np.linalg.solve(self.global_stiffness_matrix, self.load_vector)
-        return displacements
+    def partition_matrices(self):
+        # Determine free and supported DOFs
+        free_dofs = []
+        supported_dofs = []
+        for i, node in enumerate(self.nodes):
+            for j in range(6):
+                if node.bc[j]:  # This DOF is fixed
+                    supported_dofs.append(i * 12 + j)
+                else:  # This DOF is free
+                    free_dofs.append(i * 12 + j)
 
-    def solve_for_reactions(self, displacements):
-        reactions = np.dot(self.global_stiffness_matrix, displacements)
-        return reactions
+        # Partitioning the stiffness matrix
+        K_ff = self.global_stiffness_matrix[np.ix_(free_dofs, free_dofs)]
+        K_fs = self.global_stiffness_matrix[np.ix_(free_dofs, supported_dofs)]
+        K_sf = self.global_stiffness_matrix[np.ix_(supported_dofs, free_dofs)]
+        K_ss = self.global_stiffness_matrix[np.ix_(supported_dofs, supported_dofs)]
+        
+        # Partition the load vector
+        F_f = self.load_vector[free_dofs]
+        F_s = self.load_vector[supported_dofs]
+
+        return K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, supported_dofs
+
+    def solve_for_displacements(self, K_ff, F_f):
+        # Solve for displacements of free DOFs
+        delta_f = np.linalg.solve(K_ff, F_f)
+        return delta_f
+
+    def solve_for_reactions(self, K_sf, delta_f):
+        # Solve for reactions (forces at supported DOFs)
+        F_s = np.dot(K_sf, delta_f)
+        return F_s
 
 def calculate_structure_response(nodes, elements, load_vector):
     structure = Structure(nodes, elements)
     structure.apply_loads(load_vector)
-    displacements = structure.solve_for_displacements()
-    reactions = structure.solve_for_reactions(displacements)
-    
+
+    # Partition the global stiffness matrix
+    K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, supported_dofs = structure.partition_matrices()
+
+    # Solve for the displacements at the free DOFs
+    delta_f = structure.solve_for_displacements(K_ff, F_f)
+
+    # Solve for the reactions (forces and moments at the supported DOFs)
+    F_s = structure.solve_for_reactions(K_sf, delta_f)
+
+    # Assign the results to the nodes
     for i, node in enumerate(nodes):
-        node.displacement = displacements[12 * i : 12 * (i + 1)]
-        node.reaction = reactions[12 * i : 12 * (i + 1)]
-    
+        node.displacement = np.zeros(12)
+        if i in free_dofs:
+            node.displacement = delta_f[free_dofs.index(i)]
+        node.reaction = np.zeros(12)
+        if i in supported_dofs:
+            node.reaction = F_s[supported_dofs.index(i)]
+
+    # Return the displacements and reactions
     node_displacements = {node.node_id: node.displacement for node in nodes}
     node_reactions = {node.node_id: node.reaction for node in nodes}
-    
+
     return node_displacements, node_reactions
