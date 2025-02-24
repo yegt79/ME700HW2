@@ -2,12 +2,15 @@ import numpy as np
 import functions as fu
 
 class Node:
-    def __init__(self, x, y, z, node_id, is_fixed=False):
+    def __init__(self, x, y, z, node_id, bc=None):
         self.x = x
         self.y = y
         self.z = z
         self.node_id = node_id
-        self.is_fixed = is_fixed
+        # Boundary condition list: [Tx, Ty, Tz, Rx, Ry, Rz]
+        # Tx, Ty, Tz are translations (x, y, z)
+        # Rx, Ry, Rz are rotations (about x, y, z axes)
+        self.bc = bc if bc else [False, False, False, False, False, False]
 
 class Element:
     def __init__(self, node1, node2, E, nu, A, L, Iy, Iz, J):
@@ -24,7 +27,6 @@ class Element:
 
     def compute_local_stiffness_matrix(self):
         return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
-
 class Structure:
     def __init__(self, nodes, elements):
         self.nodes = nodes
@@ -60,14 +62,12 @@ class Structure:
     def apply_boundary_conditions(self):
         boundary_conditions = np.copy(self.global_stiffness_matrix)
         for node in self.nodes:
-            if node.is_fixed:
-                # Set all degrees of freedom for this node to zero in the global stiffness matrix
-                for i in range(12):
-                    # Set the entire row and column for the fixed DOF to zero
+            for i in range(6):  # Only iterate over the first 6 DOFs (translations + rotations)
+                if node.bc[i]:  # If this DOF is fixed
+                    # Set the entire row and column to zero for this DOF
                     boundary_conditions[12 * node.node_id + i, :] = 0
                     boundary_conditions[:, 12 * node.node_id + i] = 0
-                # Set the diagonal element to a large value (to avoid division by zero in solving)
-                for i in range(12):
+                    # Set diagonal to a large value to prevent singularity
                     boundary_conditions[12 * node.node_id + i, 12 * node.node_id + i] = 1e10
         return boundary_conditions
 
