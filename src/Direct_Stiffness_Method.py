@@ -1,70 +1,98 @@
 import numpy as np
 import functions as fu
 
-class BeamElement:
-    def __init__(self, E, nu, A, Iy, Iz, J, nodes):
-        """
-        Initialize the beam element with the material properties and nodes.
+class Node:
+    def __init__(self, x, y, z, node_id, is_fixed=False):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.node_id = node_id
+        self.is_fixed = is_fixed
 
-        Parameters:
-        E (float): Young's Modulus
-        nu (float): Poisson's ratio
-        A (float): Cross-sectional area
-        Iy (float): Moment of inertia about the y-axis
-        Iz (float): Moment of inertia about the z-axis
-        J (float): Polar moment of inertia
-        
-        """
+class Element:
+    def __init__(self, node1, node2, E, nu, A, L, Iy, Iz, J):
+        self.node1 = node1
+        self.node2 = node2
         self.E = E
-        self.nu = nu  # New argument added here
+        self.nu = nu
         self.A = A
+        self.L = L
         self.Iy = Iy
         self.Iz = Iz
         self.J = J
+        self.local_stiffness_matrix = self.compute_local_stiffness_matrix()
+
+    def compute_local_stiffness_matrix(self):
+        return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
+
+class Structure:
+    def __init__(self, nodes, elements):
         self.nodes = nodes
+        self.elements = elements
+        self.global_stiffness_matrix = self.assemble_global_stiffness_matrix()
+        self.load_vector = np.zeros(12 * len(nodes)) 
+        self.boundary_conditions = self.apply_boundary_conditions()
 
-    def length(self, node_positions):
-        """
-        Compute the length of the beam element between two nodes.
+    def assemble_global_stiffness_matrix(self):
+        size = 12 * len(self.nodes)
+        global_stiffness_matrix = np.zeros((size, size))
         
-        Parameters:
-        node_positions (list): The coordinates of the nodes.
+        for element in self.elements:
+            element_matrix = element.local_stiffness_matrix
+            global_stiffness_matrix += self.map_to_global_dof(element_matrix, element)
         
-        Returns:
-        float: Length of the beam element.
-        """
-        return np.linalg.norm(np.array(node_positions[-1]) - np.array(node_positions[0]))
+        return global_stiffness_matrix
 
-    def stiffness_matrix(self, node_positions):
-        """
-        Compute the global stiffness matrix for the beam element, 
-        which is generalized for any number of nodes with 6 DOF each.
+    def map_to_global_dof(self, local_matrix, element):
+        size = 12 * len(self.nodes)
+        global_matrix = np.zeros((size, size))
         
-        Parameters:
-        node_positions (list): The coordinates of the nodes.
+        node1_id, node2_id = element.node1.node_id, element.node2.node_id
         
-        Returns:
-        numpy.ndarray: The global stiffness matrix.
-        """
-        # Length of the beam
-        L = self.length(node_positions)
-
-        # Material properties
-        E, nu, A, Iy, Iz, J = self.E, self.nu, self.A, self.Iy, self.Iz, self.J
-
-        # Initialize the global stiffness matrix
-        num_dofs = self.nodes * 6  # 6 DOFs per node (3 translational + 3 rotational)
-        K_global = np.zeros((num_dofs, num_dofs))
-
-        # Loop through each element to build the local stiffness matrix and add it to the global matrix
-        for i in range(self.nodes - 1):  # (nodes-1) beam elements
-            k_local = fu.local_elastic_stiffness_matrix_3D_beam(E, nu, A, L, Iy, Iz, J)
-            
-            # Calculate the node index for the degrees of freedom for the element
-            start_dof = 6 * i
-            end_dof = 6 * (i + 2)  # 6 DOFs for each node involved in the element
-            
-            # Add the local stiffness to the global stiffness matrix
-            K_global[start_dof:end_dof, start_dof:end_dof] += k_local
+        for i in range(12):
+            for j in range(12):
+                global_row = node1_id * 12 + i
+                global_col = node2_id * 12 + j
+                global_matrix[global_row, global_col] = local_matrix[i, j]
         
-        return K_global
+        return global_matrix
+
+    def apply_boundary_conditions(self):
+        boundary_conditions = np.copy(self.global_stiffness_matrix)
+        for node in self.nodes:
+            if node.is_fixed:
+                # Set all degrees of freedom for this node to zero in the global stiffness matrix
+                for i in range(12):
+                    # Set the entire row and column for the fixed DOF to zero
+                    boundary_conditions[12 * node.node_id + i, :] = 0
+                    boundary_conditions[:, 12 * node.node_id + i] = 0
+                # Set the diagonal element to a large value (to avoid division by zero in solving)
+                for i in range(12):
+                    boundary_conditions[12 * node.node_id + i, 12 * node.node_id + i] = 1e10
+        return boundary_conditions
+
+    def apply_loads(self, load_vector):
+        self.load_vector = load_vector
+
+    def solve_for_displacements(self):
+        displacements = np.linalg.solve(self.global_stiffness_matrix, self.load_vector)
+        return displacements
+
+    def solve_for_reactions(self, displacements):
+        reactions = np.dot(self.global_stiffness_matrix, displacements)
+        return reactions
+
+def calculate_structure_response(nodes, elements, load_vector):
+    structure = Structure(nodes, elements)
+    structure.apply_loads(load_vector)
+    displacements = structure.solve_for_displacements()
+    reactions = structure.solve_for_reactions(displacements)
+    
+    for i, node in enumerate(nodes):
+        node.displacement = displacements[12 * i : 12 * (i + 1)]
+        node.reaction = reactions[12 * i : 12 * (i + 1)]
+    
+    node_displacements = {node.node_id: node.displacement for node in nodes}
+    node_reactions = {node.node_id: node.reaction for node in nodes}
+    
+    return node_displacements, node_reactions
