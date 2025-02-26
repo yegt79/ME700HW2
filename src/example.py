@@ -1,5 +1,3 @@
-# run_analysis.py
-
 import math
 import numpy as np
 from Direct_Stiffness_Method import Node, Element, Structure, calculate_structure_response
@@ -21,7 +19,7 @@ Iy = 0.5**3 / 12  # Moment of Inertia about y-axis
 Iz = 0.5 / 12  # Moment of Inertia about z-axis
 J = 0.02861  # Polar Moment of Inertia
 
-# Create Element
+# Create Elements
 element1 = Element(node0, node1, E, nu, A, Iy, Iz, J)  # From node0 to node1
 element2 = Element(node1, node2, E, nu, A, Iy, Iz, J)  # From node1 to node2
 
@@ -30,18 +28,35 @@ elements = [element1, element2]
 nodes = [node0, node1, node2]
 
 # Create Load Vector
-load_vector = np.zeros(12 * len(nodes))  # 12 DOFs per node
-load_vector[12 * 1:12 * 1 + 3] = Force  # Apply force to node1's translation DOFs
-load_vector[12 * 1 + 3:12 * 1 + 6] = Moment  # Apply moment to node1's rotational DOFs
+loads = {
+    1: np.array([0.1, 0.05, -0.07, 0.05, -0.1, 0.25])  # Apply load to node 1
+}
+
+# Boundary Conditions
+supports = {
+    0: [True, True, True, True, True, True],  # Fully fixed
+    1: [False, False, False, False, False, False],  # Free
+    2: [True, True, True, False, False, False]  # Fixed in translations only
+}
 
 # Calculate structure response
-node_displacements, node_reactions = calculate_structure_response(nodes, elements, load_vector)
+solver = dsm.Frame3DSolver(nodes, elements, loads, supports)
+displacements, reactions = solver.solve()
 
-# Output results
-print("Node Displacements:")
-for node_id, displacement in node_displacements.items():
-    print(f"Node {node_id}: {displacement}")
+# Reshape and print results
+disp_matrix = displacements.reshape((-1, 6))
+reac_matrix = reactions.reshape((-1, 6))
 
-print("\nNode Reactions:")
-for node_id, reaction in node_reactions.items():
-    print(f"Node {node_id}: {reaction}")
+disp_dict = {node: disp_matrix[i] for i, node in enumerate(nodes)}
+react_dict = {node: reac_matrix[i] for i, node in enumerate(nodes)}
+
+print("Nodal Displacements and Rotations:")
+for node, disp in disp_dict.items():
+    print(f"Node {node}: [u: {disp[0]:.10f}, v: {disp[1]:.10f}, w: {disp[2]:.10f}, "
+          f"rot_x: {disp[3]:.10f}, rot_y: {disp[4]:.10f}, rot_z: {disp[5]:.10f}]")
+
+print("\nReaction Forces and Moments at Supports:")
+for node, react in react_dict.items():
+    if node in supports:
+        print(f"Node {node}: [Fx: {react[0]:.10f}, Fy: {react[1]:.10f}, Fz: {react[2]:.10f}, "
+              f"Mx: {react[3]:.10f}, My: {react[4]:.10f}, Mz: {react[5]:.10f}]")
