@@ -8,7 +8,7 @@ class Node:
         self.y = y
         self.z = z
         self.node_id = node_id
-        self.bc = bc if bc else [False, False, False, False, False, False]
+        self.bc = bc if bc else [False, False, False, False, False, False]  # 6 DOFs: UX, UY, UZ, RX, RY, RZ
         self.displacement = None  # Store displacement
         self.reaction = None  # Store reaction
 
@@ -41,7 +41,7 @@ class Structure:
         self.nodes = nodes
         self.elements = elements
         self.global_stiffness_matrix = self.assemble_global_stiffness_matrix()
-        self.load_vector = np.zeros(12 * len(nodes))  # 12 DOFs per node
+        self.load_vector = np.zeros(6 * len(nodes))  # 6 DOFs per node
         self.boundary_conditions = self.apply_boundary_conditions()
 
     def assemble_global_stiffness_matrix(self):
