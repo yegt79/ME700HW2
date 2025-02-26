@@ -104,39 +104,29 @@ class Structure:
 
         return K_bc
 
-    def partition_matrices(self):
-        """Partitions the stiffness matrix into free and fixed DOFs for solving the system."""
-        free_dofs = []
-        fixed_dofs = []
-        
-        for node in self.nodes:
-            for j in range(6):
-                global_idx = self.node_index_map[node.node_id] * 6 + j
-                if node.bc[j]:  
-                    fixed_dofs.append(global_idx)
-                else:
-                    free_dofs.append(global_idx)
-
-        # Partitioning the stiffness matrix
-        K_ff = self.global_stiffness_matrix[np.ix_(free_dofs, free_dofs)]
-        K_fs = self.global_stiffness_matrix[np.ix_(free_dofs, fixed_dofs)]
-        K_sf = self.global_stiffness_matrix[np.ix_(fixed_dofs, free_dofs)]
-        K_ss = self.global_stiffness_matrix[np.ix_(fixed_dofs, fixed_dofs)]
-        
-        # Partition the load vector
-        F_f = self.load_vector[free_dofs]
-        F_s = self.load_vector[fixed_dofs]
-
-        return K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, fixed_dofs
-
     def solve_for_displacements(self, K_ff, F_f):
+        """Solve for displacements at free DOFs."""
+        # Check for singularity using condition number
+        cond_number = np.linalg.cond(K_ff)
+        if cond_number > 1e12:  # Threshold for numerical singularity
+            raise np.linalg.LinAlgError(f"Stiffness matrix is nearly singular (Condition Number: {cond_number})")
+
         # Solve for displacements of free DOFs
         delta_f = np.linalg.solve(K_ff, F_f)
+        
+        # Check for NaN or Inf in results
+        if np.any(np.isnan(delta_f)) or np.any(np.isinf(delta_f)):
+            raise np.linalg.LinAlgError("Solution contains NaN or Inf, indicating singular system.")
+        
+        # Check for unreasonably large values in the displacement vector
+        if np.any(np.abs(delta_f) > 1e6):  # Threshold for unreasonably large displacements
+            raise np.linalg.LinAlgError("Unreasonably large displacements, indicating numerical instability.")
+        
         return delta_f
 
     def solve_for_reactions(self, K_sf, delta_f):
-        # Solve for reactions (forces at supported DOFs)
-        F_s = np.dot(K_sf, delta_f)
+        """Solve for reactions at supported DOFs."""
+        F_s = np.dot(K_sf, delta_f)  # Reaction forces at fixed DOFs
         return F_s
 
 def calculate_structure_response(nodes, elements, load_vector):
@@ -146,7 +136,7 @@ def calculate_structure_response(nodes, elements, load_vector):
     # Partition the global stiffness matrix
     K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, supported_dofs = structure.partition_matrices()
 
-    # Solve for the displacements at the free DOFs
+    # Solve for displacements at the free DOFs
     delta_f = structure.solve_for_displacements(K_ff, F_f)
 
     # Solve for the reactions (forces and moments at the supported DOFs)
