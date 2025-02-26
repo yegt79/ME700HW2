@@ -36,17 +36,21 @@ class Element:
     def compute_local_stiffness_matrix(self):
         return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
 
+
 class Structure:
-    def __init__(self, nodes, elements):
+    def __init__(self, nodes, elements, loads=None, supports=None):
         self.nodes = nodes
         self.elements = elements
+        self.loads = loads if loads else {}
+        self.supports = supports if supports else {}
         self.node_index_map = {node.node_id: i for i, node in enumerate(nodes)}
         self.ndof = len(nodes) * 6  # Total DOFs
         self.global_stiffness_matrix = self.assemble_global_stiffness_matrix()
-        self.load_vector = np.zeros(self.ndof)  # 6 DOFs per node
+        self.load_vector = self.assemble_load_vector()
         self.boundary_conditions = self.apply_boundary_conditions()
 
     def assemble_global_stiffness_matrix(self):
+        """Assembles the global stiffness matrix correctly mapping local DOFs to global DOFs."""
         K = np.zeros((self.ndof, self.ndof))  # Global stiffness matrix
         
         for element in self.elements:
@@ -67,43 +71,63 @@ class Structure:
 
         return K
 
-    def apply_boundary_conditions(self):
-        boundary_conditions = np.copy(self.global_stiffness_matrix)
-        for node in self.nodes:
-            for i in range(6):  # Only iterate over the first 6 DOFs (translations + rotations)
-                if node.bc[i]:  # If this DOF is fixed
-                    # Set the entire row and column to zero for this DOF
-                    boundary_conditions[12 * node.node_id + i, :] = 0
-                    boundary_conditions[:, 12 * node.node_id + i] = 0
-                    # Set diagonal to a large value to prevent singularity
-                    boundary_conditions[12 * node.node_id + i, 12 * node.node_id + i] = 1e10
-        return boundary_conditions
+    def assemble_load_vector(self):
+        """Assembles the global load vector ensuring correct placement of nodal loads."""
+        if not isinstance(self.loads, dict):
+            raise TypeError("Loads must be provided as a dictionary.")
 
-    def apply_loads(self, load_vector):
-        self.load_vector = load_vector
+        F = np.zeros(self.ndof)
+        for node_id, load in self.loads.items():
+            if not isinstance(load, np.ndarray):
+                raise TypeError(f"Load at node {node_id} must be a numpy array.")
+            if load.shape != (6,):
+                raise ValueError(f"Load vector at node {node_id} must have 6 components.")
+
+            idx = self.node_index_map[node_id] * 6
+            F[idx:idx+6] += load  # Correct indexing for 6 DOFs per node
+
+        return F
+
+    def apply_boundary_conditions(self):
+        """Applies boundary conditions by modifying the global stiffness matrix for fixed DOFs."""
+        K_bc = np.copy(self.global_stiffness_matrix)
+        
+        for node in self.nodes:
+            for i in range(6):  # Iterate over all 6 DOFs (translations + rotations)
+                if node.bc[i]:  # If DOF is fixed
+                    global_idx = self.node_index_map[node.node_id] * 6 + i
+                    # Zero out row and column
+                    K_bc[global_idx, :] = 0
+                    K_bc[:, global_idx] = 0
+                    # Set diagonal to a large number to maintain numerical stability
+                    K_bc[global_idx, global_idx] = 1e10
+
+        return K_bc
 
     def partition_matrices(self):
-        # Determine free and supported DOFs
+        """Partitions the stiffness matrix into free and fixed DOFs for solving the system."""
         free_dofs = []
-        supported_dofs = []
-        for i, node in enumerate(self.nodes):
+        fixed_dofs = []
+        
+        for node in self.nodes:
             for j in range(6):
-                if node.bc[j]:  # This DOF is fixed
-                    supported_dofs.append(i * 12 + j)
-                else:  # This DOF is free
-                    free_dofs.append(i * 12 + j)
+                global_idx = self.node_index_map[node.node_id] * 6 + j
+                if node.bc[j]:  
+                    fixed_dofs.append(global_idx)
+                else:
+                    free_dofs.append(global_idx)
 
         # Partitioning the stiffness matrix
         K_ff = self.global_stiffness_matrix[np.ix_(free_dofs, free_dofs)]
-        K_fs = self.global_stiffness_matrix[np.ix_(free_dofs, supported_dofs)]
-        K_sf = self.global_stiffness_matrix[np.ix_(supported_dofs, free_dofs)]
-        K_ss = self.global_stiffness_matrix[np.ix_(supported_dofs, supported_dofs)]
+        K_fs = self.global_stiffness_matrix[np.ix_(free_dofs, fixed_dofs)]
+        K_sf = self.global_stiffness_matrix[np.ix_(fixed_dofs, free_dofs)]
+        K_ss = self.global_stiffness_matrix[np.ix_(fixed_dofs, fixed_dofs)]
         
         # Partition the load vector
         F_f = self.load_vector[free_dofs]
-        F_s = self.load_vector[supported_dofs]
+        F_s = self.load_vector[fixed_dofs]
 
-        return K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, supported_dofs
+        return K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, fixed_dofs
 
     def solve_for_displacements(self, K_ff, F_f):
         # Solve for displacements of free DOFs
