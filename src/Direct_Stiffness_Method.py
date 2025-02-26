@@ -40,33 +40,32 @@ class Structure:
     def __init__(self, nodes, elements):
         self.nodes = nodes
         self.elements = elements
+        self.node_index_map = {node.node_id: i for i, node in enumerate(nodes)}
+        self.ndof = len(nodes) * 6  # Total DOFs
         self.global_stiffness_matrix = self.assemble_global_stiffness_matrix()
-        self.load_vector = np.zeros(6 * len(nodes))  # 6 DOFs per node
+        self.load_vector = np.zeros(self.ndof)  # 6 DOFs per node
         self.boundary_conditions = self.apply_boundary_conditions()
 
     def assemble_global_stiffness_matrix(self):
-        size = 6 * len(self.nodes)  # Fixed to 6 DOFs per node
-        global_stiffness_matrix = np.zeros((size, size))
+        K = np.zeros((self.ndof, self.ndof))  # Global stiffness matrix
         
         for element in self.elements:
-            element_matrix = element.local_stiffness_matrix
-            global_stiffness_matrix += self.map_to_global_dof(element_matrix, element)
-        
-        return global_stiffness_matrix
+            k_local = element.local_stiffness_matrix
+            node1_id = element.node1.node_id
+            node2_id = element.node2.node_id
+            
+            idx1 = self.node_index_map[node1_id] * 6
+            idx2 = self.node_index_map[node2_id] * 6
 
-    def map_to_global_dof(self, local_matrix, element):
-        size = 6 * len(self.nodes)  # Fixed size to 6 DOFs per node
-        global_matrix = np.zeros((size, size))
-        
-        node1_id, node2_id = element.node1.node_id, element.node2.node_id
-        
-        for i in range(6):  # Fixed range to 6 DOFs
-            for j in range(6):
-                global_row = node1_id * 6 + i  # Updated for 6 DOFs per node
-                global_col = node2_id * 6 + j  # Updated for 6 DOFs per node
-                global_matrix[global_row, global_col] = local_matrix[i, j]
-        
-        return global_matrix
+            # Correctly map element stiffness to global matrix
+            dof_indices = np.array([idx1, idx1+1, idx1+2, idx1+3, idx1+4, idx1+5,
+                                    idx2, idx2+1, idx2+2, idx2+3, idx2+4, idx2+5])
+            
+            for i in range(12):
+                for j in range(12):
+                    K[dof_indices[i], dof_indices[j]] += k_local[i, j]
+
+        return K
 
     def apply_boundary_conditions(self):
         boundary_conditions = np.copy(self.global_stiffness_matrix)
