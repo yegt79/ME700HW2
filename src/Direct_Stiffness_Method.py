@@ -9,8 +9,8 @@ class Node:
         self.z = z
         self.node_id = node_id
         self.bc = bc if bc else [False, False, False, False, False, False]  # 6 DOFs: UX, UY, UZ, RX, RY, RZ
-        self.displacement = None  # Store displacement
-        self.reaction = None  # Store reaction
+        self.displacement = np.zeros(12)  # Store displacement (12 DOFs per node)
+        self.reaction = np.zeros(12)  # Store reaction (12 DOFs per node)
 
 class Element:
     def __init__(self, node1, node2, E, nu, A, Iy, Iz, J):
@@ -34,8 +34,8 @@ class Element:
         return L
 
     def compute_local_stiffness_matrix(self):
+        # Assuming 'fu.local_elastic_stiffness_matrix_3D_beam' is defined in your 'functions.py'
         return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
-
 
 class Structure:
     def __init__(self, nodes, elements, loads=None, supports=None):
