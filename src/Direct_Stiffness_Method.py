@@ -45,7 +45,7 @@ class Structure:
         self.boundary_conditions = self.apply_boundary_conditions()
 
     def assemble_global_stiffness_matrix(self):
-        size = 12 * len(self.nodes)
+        size = 6 * len(self.nodes)  # Fixed to 6 DOFs per node
         global_stiffness_matrix = np.zeros((size, size))
         
         for element in self.elements:
@@ -55,15 +55,15 @@ class Structure:
         return global_stiffness_matrix
 
     def map_to_global_dof(self, local_matrix, element):
-        size = 12 * len(self.nodes)
+        size = 6 * len(self.nodes)  # Fixed size to 6 DOFs per node
         global_matrix = np.zeros((size, size))
         
         node1_id, node2_id = element.node1.node_id, element.node2.node_id
         
-        for i in range(12):
-            for j in range(12):
-                global_row = node1_id * 12 + i
-                global_col = node2_id * 12 + j
+        for i in range(6):  # Fixed range to 6 DOFs
+            for j in range(6):
+                global_row = node1_id * 6 + i  # Updated for 6 DOFs per node
+                global_col = node2_id * 6 + j  # Updated for 6 DOFs per node
                 global_matrix[global_row, global_col] = local_matrix[i, j]
         
         return global_matrix
