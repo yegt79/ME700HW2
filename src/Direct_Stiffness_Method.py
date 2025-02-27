@@ -1,158 +1,158 @@
 import math
 import numpy as np
-import functions as fu
+import functions as fu  # Ensure 'functions.py' has correct stiffness matrix calculations
+from functions import rotation_matrix_3D, transformation_matrix_3D
 
-class Node:
-    def __init__(self, x, y, z, node_id, bc=None):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.node_id = node_id
-        self.bc = bc if bc else [False, False, False, False, False, False]  # 6 DOFs: UX, UY, UZ, RX, RY, RZ
-        self.displacement = np.zeros(12)  # Store displacement (12 DOFs per node)
-        self.reaction = np.zeros(12)  # Store reaction (12 DOFs per node)
+def check_unit_vector(v: np.ndarray):
+    """Ensure vector is a unit vector."""
+    if np.isclose(np.linalg.norm(v), 1.0):
+        return True
+    else:
+        raise ValueError(f"Input vector is not a unit vector. Norm = {np.linalg.norm(v)}.")
 
-class Element:
-    def __init__(self, node1, node2, E, nu, A, Iy, Iz, J):
-        self.node1 = node1
-        self.node2 = node2
-        self.E = E
-        self.nu = nu
-        self.A = A
-        self.Iy = Iy
-        self.Iz = Iz
-        self.J = J
-        self.L = self.calculate_length()
-        self.local_stiffness_matrix = self.compute_local_stiffness_matrix()
+def check_parallel(v1: np.ndarray, v2: np.ndarray):
+    """Ensure vectors are not parallel."""
+    if np.isclose(np.dot(v1, v2), 1.0) or np.isclose(np.dot(v1, v2), -1.0):
+        raise ValueError("Vectors are parallel.")
 
-    def calculate_length(self):
-        # Calculate the distance between the two nodes (Euclidean distance)
-        x1, y1, z1 = self.node1.x, self.node1.y, self.node1.z
-        x2, y2, z2 = self.node2.x, self.node2.y, self.node2.z
-        # Euclidean distance formula
-        L = math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
-        return L
+def create_node(x, y, z, node_id, bc=None):
+    """Create a node with displacement and reaction initialized."""
+    return {
+        'x': x,
+        'y': y,
+        'z': z,
+        'node_id': node_id,
+        'bc': bc if bc else [False, False, False, False, False, False],  # UX, UY, UZ, RX, RY, RZ
+        'displacement': np.zeros(6),
+        'reaction': np.zeros(6)
+    }
 
-    def compute_local_stiffness_matrix(self):
-        # Assuming 'fu.local_elastic_stiffness_matrix_3D_beam' is defined in your 'functions.py'
-        return fu.local_elastic_stiffness_matrix_3D_beam(self.E, self.nu, self.A, self.L, self.Iy, self.Iz, self.J)
+def create_element(node1, node2, E, nu, A, Iy, Iz, J):
+    """Create an element and compute relevant properties."""
+    L = calculate_length(node1, node2)
+    rotation_matrix = compute_rotation_matrix(node1, node2)
+    local_stiffness_matrix = compute_local_stiffness_matrix(E, nu, A, L, Iy, Iz, J)
+    global_stiffness_matrix = transform_to_global(local_stiffness_matrix, rotation_matrix)
+    
+    return {
+        'node1': node1,
+        'node2': node2,
+        'E': E,
+        'nu': nu,
+        'A': A,
+        'Iy': Iy,
+        'Iz': Iz,
+        'J': J,
+        'L': L,
+        'rotation_matrix': rotation_matrix,
+        'local_stiffness_matrix': local_stiffness_matrix,
+        'global_stiffness_matrix': global_stiffness_matrix
+    }
 
-class Structure:
-    def __init__(self, nodes, elements, loads=None, supports=None):
-        self.nodes = nodes
-        self.elements = elements
-        self.loads = loads if loads else {}
-        self.supports = supports if supports else {}
-        self.node_index_map = {node.node_id: i for i, node in enumerate(nodes)}
-        self.ndof = len(nodes) * 6  # Total DOFs
-        self.global_stiffness_matrix = self.assemble_global_stiffness_matrix()
-        self.load_vector = self.assemble_load_vector()
-        self.boundary_conditions = self.apply_boundary_conditions()
+def calculate_length(node1, node2):
+    """Calculate the Euclidean distance between the two nodes."""
+    x1, y1, z1 = node1['x'], node1['y'], node1['z']
+    x2, y2, z2 = node2['x'], node2['y'], node2['z']
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
 
-    def assemble_global_stiffness_matrix(self):
-        """Assembles the global stiffness matrix correctly mapping local DOFs to global DOFs."""
-        K = np.zeros((self.ndof, self.ndof))  # Global stiffness matrix
+def compute_rotation_matrix(node1, node2):
+    """Compute the 3x3 rotation matrix using the provided 3D rotation function."""
+    x1, y1, z1 = node1['x'], node1['y'], node1['z']
+    x2, y2, z2 = node2['x'], node2['y'], node2['z']
+    return rotation_matrix_3D(x1, y1, z1, x2, y2, z2)
+
+def compute_local_stiffness_matrix(E, nu, A, L, Iy, Iz, J):
+    """Compute the local element stiffness matrix."""
+    return fu.local_elastic_stiffness_matrix_3D_beam(E, nu, A, L, Iy, Iz, J)
+
+def transform_to_global(local_stiffness_matrix, rotation_matrix):
+    """Transform local stiffness matrix to the global coordinate system."""
+    Gamma = transformation_matrix_3D(rotation_matrix)
+    return Gamma.T @ local_stiffness_matrix @ Gamma
+
+def assemble_global_stiffness_matrix(nodes, elements):
+    """Assembles the global stiffness matrix with correct DOF mapping."""
+    ndof = len(nodes) * 6  # Total DOFs
+    K = np.zeros((ndof, ndof))  
+
+    node_index_map = {node['node_id']: i for i, node in enumerate(nodes)}
+
+    for element in elements:
+        k_global = element['global_stiffness_matrix']
+        node1_id = element['node1']['node_id']
+        node2_id = element['node2']['node_id']
+
+        idx1 = node_index_map[node1_id] * 6
+        idx2 = node_index_map[node2_id] * 6
+
+        dof_indices = np.array([idx1, idx1+1, idx1+2, idx1+3, idx1+4, idx1+5,
+                                idx2, idx2+1, idx2+2, idx2+3, idx2+4, idx2+5])
         
-        for element in self.elements:
-            k_local = element.local_stiffness_matrix
-            node1_id = element.node1.node_id
-            node2_id = element.node2.node_id
-            
-            idx1 = self.node_index_map[node1_id] * 6
-            idx2 = self.node_index_map[node2_id] * 6
+        for i in range(12):
+            for j in range(12):
+                K[dof_indices[i], dof_indices[j]] += k_global[i, j]
 
-            # Correctly map element stiffness to global matrix
-            dof_indices = np.array([idx1, idx1+1, idx1+2, idx1+3, idx1+4, idx1+5,
-                                    idx2, idx2+1, idx2+2, idx2+3, idx2+4, idx2+5])
-            
-            for i in range(12):
-                for j in range(12):
-                    K[dof_indices[i], dof_indices[j]] += k_local[i, j]
+    return K
 
-        return K
+def assemble_load_vector(nodes, loads):
+    """Assembles the global load vector ensuring correct placement."""
+    ndof = len(nodes) * 6
+    F = np.zeros(ndof)
 
-    def assemble_load_vector(self):
-        """Assembles the global load vector ensuring correct placement of nodal loads."""
-        if not isinstance(self.loads, dict):
-            raise TypeError("Loads must be provided as a dictionary.")
+    node_index_map = {node['node_id']: i for i, node in enumerate(nodes)}
 
-        F = np.zeros(self.ndof)
-        for node_id, load in self.loads.items():
-            if not isinstance(load, np.ndarray):
-                raise TypeError(f"Load at node {node_id} must be a numpy array.")
-            if load.shape != (6,):
-                raise ValueError(f"Load vector at node {node_id} must have 6 components.")
+    for node_id, load in loads.items():
+        idx = node_index_map[node_id] * 6
+        F[idx:idx+6] += load
 
-            idx = self.node_index_map[node_id] * 6
-            F[idx:idx+6] += load  # Correct indexing for 6 DOFs per node
+    return F
 
-        return F
+def apply_boundary_conditions(nodes, global_stiffness_matrix, load_vector):
+    """Applies boundary conditions and extracts the reduced system."""
+    fixed_dof = []
+    node_index_map = {node['node_id']: i for i, node in enumerate(nodes)}
 
-    def apply_boundary_conditions(self):
-        """Applies boundary conditions by modifying the global stiffness matrix for fixed DOFs."""
-        K_bc = np.copy(self.global_stiffness_matrix)
-        
-        for node in self.nodes:
-            for i in range(6):  # Iterate over all 6 DOFs (translations + rotations)
-                if node.bc[i]:  # If DOF is fixed
-                    global_idx = self.node_index_map[node.node_id] * 6 + i
-                    # Zero out row and column
-                    K_bc[global_idx, :] = 0
-                    K_bc[:, global_idx] = 0
-                    # Set diagonal to a large number to maintain numerical stability
-                    K_bc[global_idx, global_idx] = 1e10
+    for node in nodes:
+        idx = node_index_map[node['node_id']] * 6
+        for i, is_fixed in enumerate(node['bc']):
+            if is_fixed:
+                fixed_dof.append(idx + i)
 
-        return K_bc
+    fixed_dof = np.array(fixed_dof)
+    all_dof = np.arange(global_stiffness_matrix.shape[0])
+    free_dof = np.setdiff1d(all_dof, fixed_dof)
 
-    def solve_for_displacements(self, K_ff, F_f):
-        """Solve for displacements at free DOFs."""
-        # Check for singularity using condition number
-        cond_number = np.linalg.cond(K_ff)
-        if cond_number > 1e12:  # Threshold for numerical singularity
-            raise np.linalg.LinAlgError(f"Stiffness matrix is nearly singular (Condition Number: {cond_number})")
+    K_reduced = global_stiffness_matrix[np.ix_(free_dof, free_dof)]
+    F_reduced = load_vector[free_dof]
 
-        # Solve for displacements of free DOFs
-        delta_f = np.linalg.solve(K_ff, F_f)
-        
-        # Check for NaN or Inf in results
-        if np.any(np.isnan(delta_f)) or np.any(np.isinf(delta_f)):
-            raise np.linalg.LinAlgError("Solution contains NaN or Inf, indicating singular system.")
-        
-        # Check for unreasonably large values in the displacement vector
-        if np.any(np.abs(delta_f) > 1e6):  # Threshold for unreasonably large displacements
-            raise np.linalg.LinAlgError("Unreasonably large displacements, indicating numerical instability.")
-        
-        return delta_f
+    return K_reduced, F_reduced, free_dof, fixed_dof
 
-    def solve_for_reactions(self, K_sf, delta_f):
-        """Solve for reactions at supported DOFs."""
-        F_s = np.dot(K_sf, delta_f)  # Reaction forces at fixed DOFs
-        return F_s
+def solve_system(global_stiffness_matrix, load_vector, K_reduced, F_reduced, free_dof):
+    """Solves the system for displacements and reactions."""
+    d = np.zeros(global_stiffness_matrix.shape[0])
 
-def calculate_structure_response(nodes, elements, load_vector):
-    structure = Structure(nodes, elements)
-    structure.apply_loads(load_vector)
+    try:
+        d_free = np.linalg.solve(K_reduced, F_reduced)
+        d[free_dof] = d_free
+    except np.linalg.LinAlgError as e:
+        raise np.linalg.LinAlgError(f"Error solving system: {e}")
 
-    # Partition the global stiffness matrix
-    K_ff, K_fs, K_sf, K_ss, F_f, F_s, free_dofs, supported_dofs = structure.partition_matrices()
+    reactions = global_stiffness_matrix @ d - load_vector
 
-    # Solve for displacements at the free DOFs
-    delta_f = structure.solve_for_displacements(K_ff, F_f)
+    return d, reactions
 
-    # Solve for the reactions (forces and moments at the supported DOFs)
-    F_s = structure.solve_for_reactions(K_sf, delta_f)
+def calculate_structure_response(nodes, elements, loads):
+    """Creates a structure and solves it."""
+    global_stiffness_matrix = assemble_global_stiffness_matrix(nodes, elements)
+    load_vector = assemble_load_vector(nodes, loads)
+    K_reduced, F_reduced, free_dof, fixed_dof = apply_boundary_conditions(nodes, global_stiffness_matrix, load_vector)
+    displacements, reactions = solve_system(global_stiffness_matrix, load_vector, K_reduced, F_reduced, free_dof)
 
-    # Assign the results to the nodes
+    # Assign displacements and reactions to nodes
+    node_index_map = {node['node_id']: i for i, node in enumerate(nodes)}
     for i, node in enumerate(nodes):
-        node.displacement = np.zeros(12)
-        if i in free_dofs:
-            node.displacement = delta_f[free_dofs.index(i)]
-        node.reaction = np.zeros(12)
-        if i in supported_dofs:
-            node.reaction = F_s[supported_dofs.index(i)]
+        idx = i * 6
+        node['displacement'] = displacements[idx:idx+6]
+        node['reaction'] = reactions[idx:idx+6]
 
-    # Return the displacements and reactions
-    node_displacements = {node.node_id: node.displacement for node in nodes}
-    node_reactions = {node.node_id: node.reaction for node in nodes}
-
-    return node_displacements, node_reactions
+    return displacements, reactions
