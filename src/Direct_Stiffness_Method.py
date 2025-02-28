@@ -56,10 +56,18 @@ def calculate_length(node1, node2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
 
 def compute_rotation_matrix(node1, node2):
-    """Compute the 3x3 rotation matrix using the provided 3D rotation function."""
     x1, y1, z1 = node1['x'], node1['y'], node1['z']
     x2, y2, z2 = node2['x'], node2['y'], node2['z']
-    return rotation_matrix_3D(x1, y1, z1, x2, y2, z2)
+    L = calculate_length(node1, node2)
+    local_x = np.array([(x2-x1)/L, (y2-y1)/L, (z2-z1)/L])
+    if np.isclose(local_x[0], 0.0) and np.isclose(local_x[1], 0.0):
+        v_temp = np.array([1.0, 0.0, 0.0])
+    else:
+        v_temp = np.array([0.0, 0.0, 1.0])
+    local_y = np.cross(v_temp, local_x)
+    local_y /= np.linalg.norm(local_y)
+    local_z = np.cross(local_x, local_y)
+    return np.vstack((local_x, local_y, local_z))
 
 def compute_local_stiffness_matrix(E, nu, A, L, Iy, Iz, J):
     """Compute the local element stiffness matrix."""
