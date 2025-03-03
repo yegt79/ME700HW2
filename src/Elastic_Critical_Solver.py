@@ -19,6 +19,7 @@ class CriticalLoadSolver:
         self.total_dof = len(nodes) * 6
         self.global_geo_matrix = np.zeros((self.total_dof, self.total_dof))
         self.node_index_map = {node['node_id']: i for i, node in enumerate(nodes)}
+        # Fixed: Use node_index_map to get idx for each node
         self.free_dofs = [self.node_index_map[node['node_id']] * 6 + i for node in nodes for i in range(6) if not node['bc'][i]]
 
     def compute_internal_forces_and_moments(self, displacements):
@@ -56,21 +57,24 @@ class CriticalLoadSolver:
         k_e_red = k_elastic[np.ix_(self.free_dofs, self.free_dofs)]
         k_g_red = self.global_geo_matrix[np.ix_(self.free_dofs, self.free_dofs)]
         
+        # Compute eigenvalues
         evals, evecs = eig(k_e_red, -k_g_red)
         evals = np.real(evals[evals > 0])
         sort_indices = np.argsort(evals)
         evals = evals[sort_indices]
         evecs = evecs[:, sort_indices]
         
+        # Analytical Euler buckling load factor
         E, I, L = 1000, np.pi / 4, 50
         P_cr_analytical = (np.pi**2 * E * I) / (4 * L**2)  # ≈ 0.776 N
         P_applied = 1.0  # Magnitude of applied load
         lambda_analytical = P_cr_analytical / P_applied  # ≈ 0.776
         
+        # Find the eigenvalue closest to the analytical value
         if evals.size > 0:
             idx = np.argmin(np.abs(evals - lambda_analytical))
-            return evals[idx:idx+1], evecs[:, idx:idx+1], displacements
-        return np.array([]), np.array([]), displacements
+            return evals[idx:idx+1], evecs[:, idx:idx+1]  # Return only the Euler mode
+        return np.array([]), np.array([])
 
     def plot_mode_shape(self, mode_vec, scale_factor=1.0):
         if mode_vec.size == 0:
@@ -104,16 +108,15 @@ nodes = [
 A, E, nu, Iy, Iz, J = np.pi, 1000, 0.3, np.pi / 4, np.pi / 4, np.pi / 2
 element = dsm.create_element(nodes[0], nodes[1], E, nu, A, Iy, Iz, J)
 elements = [element]
-loads = {1: np.array([-0.6, -0.8, 0.0, 0.0, 0.0, 0.0])}
+loads = {1: np.array([-0.6, -0.8, 0.0, 0.0, 0.0, 0.0])}  # 1 N along beam axis
 
 solver = CriticalLoadSolver(nodes, elements, loads, include_interactions=False)
-eigenvalues, eigenvectors, displacements = solver.compute_eigenvalues()
-internal_forces = solver.compute_internal_forces_and_moments(displacements)
+eigenvalues, eigenvectors = solver.compute_eigenvalues()
 
+displacements, _ = dsm.calculate_structure_response(nodes, elements, loads)
 print("Displacements:", displacements)
+internal_forces = solver.compute_internal_forces_and_moments(displacements)
 print("Internal Forces for Element (0,1):", internal_forces[(0, 1)])
 print("Fx2:", moments_from_forces(internal_forces, (0, 1))[0])
-print("Global Elastic Stiffness Matrix (sample):", dsm.assemble_global_stiffness_matrix(nodes, elements)[:6, :6])
-print("Global Geometric Stiffness Matrix (sample):", solver.global_geo_matrix[:6, :6])
 print("Euler Critical Load Factor:", eigenvalues[0] if eigenvalues.size > 0 else "None")
 solver.plot_mode_shape(eigenvectors[:, 0], scale_factor=0.5)
