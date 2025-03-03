@@ -35,7 +35,7 @@ This project implements a 3D beam buckling analysis using the Direct Stiffness M
   - `plot_mode_shape(mode_vec, scale_factor)`: Visualizes the buckling mode in 3D.
 - **Dependencies**: `numpy`, `scipy.linalg`, `matplotlib`, `Direct_Stiffness_Method.py`, `functions.py`.
 
-### 4. `example1.py`
+### 4. `example_part2.py`
 - **Purpose**: Demonstrates the usage of the above modules with a simple vertical beam buckling problem.
 - **Structure**:
   - Defines two nodes (fixed base at (0,0,0), free top at (0,0,5)).
