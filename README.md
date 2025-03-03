@@ -51,7 +51,7 @@ This project implements a 3D beam buckling analysis using the Direct Stiffness M
 
 ## Usage
 1. **Setup**:
-   - Place all files (`functions.py`, `Direct_Stiffness_Method.py`, `Elastic_Critical_Solver.py`, `example1.py`) in the same directory (e.g., `/usr4/me700/yegt/ME700HW2-8/src/`).
+   - Place all files (`functions.py`, `Direct_Stiffness_Method.py`, `Elastic_Critical_Solver.py`, `example_part2.py`) in the same directory.
    - Ensure your Python environment has the required libraries installed.
 
 2. **Run the Example**:
