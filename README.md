@@ -47,7 +47,7 @@ This project implements a 3D beam buckling analysis using the Direct Stiffness M
 ## Prerequisites
 - Python 3.x
 - Libraries: `numpy`, `scipy`, `matplotlib`
-- Conda environment (optional): Configure as needed (e.g., `env2` in the example).
+- Conda environment (optional): Configure as needed.
 
 ## Usage
 1. **Setup**:
