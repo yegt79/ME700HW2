@@ -27,10 +27,25 @@ def create_node(x, y, z, node_id, bc=None):
         'reaction': np.zeros(6)
     }
 
-def create_element(node1, node2, E, nu, A, Iy, Iz, J):
-    """Create an element and compute relevant properties."""
+def create_element(node1: dict, node2: dict, E: float, nu: float, A: float, Iy: float, Iz: float, J: float, v_temp: np.ndarray = None) -> dict:
+    """Create an element and compute relevant properties.
+
+    Args:
+        node1 (dict): First node of the element.
+        node2 (dict): Second node of the element.
+        E (float): Young's Modulus.
+        nu (float): Poisson's Ratio.
+        A (float): Cross-sectional area.
+        Iy (float): Moment of inertia about y-axis.
+        Iz (float): Moment of inertia about z-axis.
+        J (float): Polar moment of inertia.
+        v_temp (np.ndarray, optional): Temporary reference vector for rotation matrix. Defaults to None.
+
+    Returns:
+        dict: Element properties including stiffness matrices.
+    """
     L = calculate_length(node1, node2)
-    rotation_matrix = compute_rotation_matrix(node1, node2)
+    rotation_matrix = compute_rotation_matrix(node1, node2, v_temp=v_temp)  # Pass v_temp here
     local_stiffness_matrix = compute_local_stiffness_matrix(E, nu, A, L, Iy, Iz, J)
     global_stiffness_matrix = transform_to_global(local_stiffness_matrix, rotation_matrix)
     
@@ -55,19 +70,70 @@ def calculate_length(node1, node2):
     x2, y2, z2 = node2['x'], node2['y'], node2['z']
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
 
-def compute_rotation_matrix(node1, node2):
-    x1, y1, z1 = node1['x'], node1['y'], node1['z']
-    x2, y2, z2 = node2['x'], node2['y'], node2['z']
+def compute_rotation_matrix(node1: dict, node2: dict, v_temp: np.ndarray = None) -> np.ndarray:
+    """
+    Compute the 3D rotation matrix for a beam element based on node coordinates.
+    (Based on Chapter 5.1 of McGuire's Matrix Structural Analysis 2nd Edition)
+
+    Args:
+        node1 (dict): First node with keys 'x', 'y', 'z'.
+        node2 (dict): Second node with keys 'x', 'y', 'z'.
+        v_temp (np.ndarray, optional): Temporary reference vector for local coordinate system.
+                                       Defaults to None, triggering automatic selection.
+
+    Returns:
+        np.ndarray: 3x3 rotation matrix aligning local element axes with global axes.
+
+    Raises:
+        TypeError: If node coordinates are not numerical.
+        ValueError: If element length is zero, v_temp is not a unit vector, or vectors are parallel.
+    """
+    # Extract coordinates and validate type
+    try:
+        x1, y1, z1 = node1['x'], node1['y'], node1['z']
+        x2, y2, z2 = node2['x'], node2['y'], node2['z']
+    except KeyError:
+        raise KeyError("Nodes must have 'x', 'y', and 'z' keys.")
+    
+    if not all(isinstance(coord, (int, float)) for coord in [x1, y1, z1, x2, y2, z2]):
+        raise TypeError("Node coordinates must be numerical values.")
+
+    # Calculate length and check for zero length
     L = calculate_length(node1, node2)
-    local_x = np.array([(x2-x1)/L, (y2-y1)/L, (z2-z1)/L])
-    if np.isclose(local_x[0], 0.0) and np.isclose(local_x[1], 0.0):
-        v_temp = np.array([1.0, 0.0, 0.0])
+    if np.isclose(L, 0.0):
+        raise ValueError("Element length cannot be zero.")
+
+    # Compute local_x (element direction)
+    local_x = np.array([(x2 - x1) / L, (y2 - y1) / L, (z2 - z1) / L])
+
+    # Define or validate v_temp
+    if v_temp is None:
+        if np.isclose(local_x[0], 0.0) and np.isclose(local_x[1], 0.0):
+            v_temp = np.array([0.0, 1.0, 0.0])  # Use Y-axis like your friend's code
+        else:
+            v_temp = np.array([0.0, 0.0, 1.0])  # Use Z-axis
     else:
-        v_temp = np.array([0.0, 0.0, 1.0])
+        # Reuse your existing helper functions (assuming they're in your code)
+        if not np.isclose(np.linalg.norm(v_temp), 1.0):
+            raise ValueError(f"Input v_temp is not a unit vector. Norm = {np.linalg.norm(v_temp)}.")
+        if np.isclose(np.abs(np.dot(local_x, v_temp)), 1.0):
+            raise ValueError("v_temp and local_x are parallel.")
+
+    # Compute local_y and local_z
     local_y = np.cross(v_temp, local_x)
-    local_y /= np.linalg.norm(local_y)
+    local_y = local_y / np.linalg.norm(local_y)  # Normalize explicitly
+
     local_z = np.cross(local_x, local_y)
-    return np.vstack((local_x, local_y, local_z))
+    local_z = local_z / np.linalg.norm(local_z)  # Normalize explicitly
+
+    # Assemble rotation matrix
+    gamma = np.vstack((local_x, local_y, local_z))
+
+    # Validate shape
+    if gamma.shape != (3, 3):
+        raise ValueError("Rotation matrix must be 3x3.")
+    #print(f"Element from {node1['node_id']} to {node2['node_id']}: Rotation Matrix:\n{gamma}")
+    return gamma
 
 def compute_local_stiffness_matrix(E, nu, A, L, Iy, Iz, J):
     """Compute the local element stiffness matrix."""
