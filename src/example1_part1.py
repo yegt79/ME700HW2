@@ -17,8 +17,8 @@ Iz = 0.5 / 12  # Moment of Inertia about z-axis
 J = 0.02861  # Polar Moment of Inertia
 
 # Create Elements
-element1 = create_element(node0, node1, E, nu, A, Iy, Iz, J)  # From node0 to node1
-element2 = create_element(node1, node2, E, nu, A, Iy, Iz, J)  # From node1 to node2
+element1 = create_element(node0, node1, E, nu, A, Iy, Iz, J, v_temp=np.array([0.0, 0.0, 1.0]))  # From node0 to node1 
+element2 = create_element(node1, node2, E, nu, A, Iy, Iz, J, v_temp=np.array([1.0, 0.0, 0.0]))  # From node1 to node2
 
 # Add elements to structure
 elements = [element1, element2]
