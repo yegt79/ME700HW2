@@ -2,7 +2,7 @@
 # A script to define inputs, import dsm.py, and run beam analysis
 
 import numpy as np
-from dsm import BeamComponent, BoundaryCondition, BeamSolver
+from Direct_stiffness_Methodd import BeamComponent, BoundaryCondition, BeamSolver
 
 # Define inputs
 # Material properties: Steel beam (E in Pa, A in m^2, Iy/Iz/J in m^4)
