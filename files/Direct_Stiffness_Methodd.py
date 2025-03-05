@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.linalg as sp
 import matplotlib.pyplot as plt
-import functions as fu
-from functions import rotation_matrix_3D, transformation_matrix_3D
+import functionss as fu
+from functionss import rotation_matrix_3D, transformation_matrix_3D
 from typing import List, Dict, Tuple, Optional
 
 class BeamComponent:
