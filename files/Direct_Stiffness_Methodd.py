@@ -1,7 +1,7 @@
 # Direct_Stiffness_Methodd.py
 import numpy as np
 import scipy.linalg as sp
-import functionss as mut
+import functionss as fu
 from functionss import rotation_matrix_3D, transformation_matrix_3D
 from typing import List, Dict, Tuple, Optional
 
@@ -128,7 +128,7 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
-            k_local = mut.local_elastic_stiffness_matrix_3D_beam(
+            k_local = fu.local_elastic_stiffness_matrix_3D_beam(
                 self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
@@ -200,7 +200,7 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
-            k_local = mut.local_elastic_stiffness_matrix_3D_beam(
+            k_local = fu.local_elastic_stiffness_matrix_3D_beam(
                 self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
@@ -247,7 +247,7 @@ class BeamSolver:
             forces = self.internal_forces[elem_idx]
             Fx2, Fy1, Fz1, Mx1, My1, Mz1, _, Fy2, Fz2, Mx2, My2, Mz2 = forces
 
-            k_geo = mut.local_geometric_stiffness_matrix_3D_beam(
+            k_geo = fu.local_geometric_stiffness_matrix_3D_beam(
                 L, self.beam.A, Ip, Fx2, Mx2, My1, Mz1, My2, Mz2
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
