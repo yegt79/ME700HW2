@@ -1,22 +1,22 @@
-# beam_analysis.py
-# A script to define inputs, import dsm.py, and run beam analysis
+# prob1.py
+# A script to define inputs, import Direct_Stiffness_Methodd.py, and run beam analysis
 
 import numpy as np
-from Direct_stiffness_Methodd import BeamComponent, BoundaryCondition, BeamSolver
+from Direct_Stiffness_Methodd import BeamComponent, BoundaryCondition, BeamSolver
 
 # Define inputs
 # Material properties: Steel beam (E in Pa, A in m^2, Iy/Iz/J in m^4)
-E = 200e9  # Young's Modulus (200 GPa)
-nu = 0.3   # Poisson's Ratio
-A = 0.01   # Cross-sectional area (100 cm^2)
-Iy = 1e-4  # Moment of inertia about y-axis (10000 cm^4)
-Iz = 1e-4  # Moment of inertia about z-axis (10000 cm^4)
-J = 2e-4   # Polar moment of inertia (20000 cm^4)
+E = 1000  # Young's Modulus (1000 Pa)
+nu = 0.3  # Poisson's Ratio
+A = np.pi * 1.0**2 # Cross-sectional area (approx 6.2832 m^2)
+Iy = np.pi / 4.0  # Moment of inertia about y-axis (approx 3.1416 m^4)
+Iz = np.pi / 4.0  # Moment of inertia about z-axis (approx 3.1416 m^4)
+J = np.pi / 2.0  # Polar moment of inertia (approx 6.2832 m^4)
 
 # Nodes: [x, y, z, node_id] in meters
 nodes = np.array([
     [0.0, 0.0, 0.0, 0],  # Node 0 at origin
-    [1.0, 0.0, 0.0, 1],  # Node 1 at 1m along x-axis
+    [30.0, 40.0, 0.0, 1],  # Node 1 at (30m, 40m, 0m)
 ])
 
 # Elements: [node1_id, node2_id]
@@ -27,12 +27,15 @@ elements = np.array([
 # Boundary conditions: {node_id: (UX, UY, UZ, RX, RY, RZ)}
 fixed_nodes = {
     0: (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),  # Fixed support at node 0
-    1: (0.0, 0.0, 0.0, None, None, None),  # Pinned support at node 1
+    1: (None, None, None, None, None, None),  # Pinned support at node 1
 }
 
 # Loads: {node_id: (FX, FY, FZ, MX, MY, MZ)} in Newtons and Newton-meters
+# Force vector F = [3/5, -4/5, 0], magnitude 1000 N
+fx = 3/5
+fy = 4/5
 loads = {
-    1: (0.0, 0.0, -1000.0, 0.0, 0.0, 0.0),  # 1000N downward force at node 1
+    1: (fx, fy, 0.0, 0.0, 0.0, 0.0),  # Force at node 1
 }
 
 # Set up the beam and boundary conditions
