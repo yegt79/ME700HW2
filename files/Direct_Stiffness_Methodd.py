@@ -131,7 +131,7 @@ class BeamSolver:
             k_local = fu.local_elastic_stiffness_matrix_3D_beam(
                 self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
             )
-            gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
+            gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
             k_global = T.T @ k_local @ T
 
@@ -203,7 +203,7 @@ class BeamSolver:
             k_local = fu.local_elastic_stiffness_matrix_3D_beam(
                 self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
             )
-            gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
+            gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
 
             dofs = np.array([
@@ -250,7 +250,7 @@ class BeamSolver:
             k_geo = fu.local_geometric_stiffness_matrix_3D_beam(
                 L, self.beam.A, Ip, Fx2, Mx2, My1, Mz1, My2, Mz2
             )
-            gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
+            gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
             k_geo_global = T.T @ k_geo @ T
 
