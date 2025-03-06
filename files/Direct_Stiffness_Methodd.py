@@ -1,7 +1,7 @@
+# Direct_Stiffness_Methodd.py
 import numpy as np
 import scipy.linalg as sp
-import matplotlib.pyplot as plt
-import functionss as fu
+import functionss as mut
 from functionss import rotation_matrix_3D, transformation_matrix_3D
 from typing import List, Dict, Tuple, Optional
 
@@ -10,19 +10,6 @@ class BeamComponent:
     
     def __init__(self, nodes: np.ndarray, elements: np.ndarray, 
                  E: float, nu: float, A: float, Iy: float, Iz: float, J: float):
-        """
-        Initialize the beam structure with nodes and elements.
-        
-        Args:
-            nodes (np.ndarray): Shape (n_nodes, 4) - [x, y, z, node_id].
-            elements (np.ndarray): Shape (n_elements, 2) - [node1_id, node2_id].
-            E (float): Young's Modulus.
-            nu (float): Poisson's Ratio.
-            A (float): Cross-sectional area.
-            Iy (float): Moment of inertia about y-axis.
-            Iz (float): Moment of inertia about z-axis.
-            J (float): Polar moment of inertia.
-        """
         self.nodes = np.array(nodes, dtype=float)
         self.elements = np.array(elements, dtype=int)
         self.E = E
@@ -33,14 +20,13 @@ class BeamComponent:
         self.J = J
         
         self._validate_material_properties()
-        self.bc = np.full((self.nodes.shape[0], 6), False)  # [UX, UY, UZ, RX, RY, RZ]
+        self.bc = np.full((self.nodes.shape[0], 6), False)
         self.displacements = np.zeros((self.nodes.shape[0], 6))
         self.reactions = np.zeros((self.nodes.shape[0], 6))
         self.element_properties = self._compute_element_properties()
         self._validate_inputs()
 
     def _validate_inputs(self):
-        """Validate the inputs for nodes and elements."""
         if not isinstance(self.nodes, np.ndarray):
             raise ValueError(f"Nodes must be a NumPy array, got {type(self.nodes)}.")
         if self.nodes.ndim != 2 or self.nodes.shape[1] != 4:
@@ -59,7 +45,6 @@ class BeamComponent:
                 raise ValueError(f"Element {i} has invalid node2_id {node2_id}; must be in nodes array (max {max_node_id}).")
 
     def _validate_material_properties(self):
-        """Validate the material and geometric properties of the beam."""
         if not isinstance(self.E, (int, float)) or self.E <= 0:
             raise ValueError(f"Young's Modulus (E) must be positive, got {self.E}.")
         if not isinstance(self.nu, (int, float)) or self.nu < -1 or self.nu > 0.5:
@@ -74,7 +59,6 @@ class BeamComponent:
             raise ValueError(f"Polar moment of inertia (J) must be positive, got {self.J}.")
 
     def _compute_element_properties(self):
-        """Placeholder for computing element properties."""
         pass
 
 class BoundaryCondition:
@@ -82,18 +66,11 @@ class BoundaryCondition:
     
     def __init__(self, fixed_nodes: Dict[int, Tuple[Optional[float], Optional[float], Optional[float],
                                                     Optional[float], Optional[float], Optional[float]]]):
-        """
-        Initialize boundary conditions with fixed node constraints.
-        
-        Args:
-            fixed_nodes (dict): Dictionary where keys are node IDs and values are tuples of 6 DOF constraints.
-        """
         self.fixed_nodes = fixed_nodes
         self.applied_loads = {}
         self._check_fixed_nodes()
 
     def _check_fixed_nodes(self):
-        """Validate the fixed_nodes dictionary."""
         for node_id, constraints in self.fixed_nodes.items():
             if not isinstance(node_id, int) or node_id < 0:
                 raise ValueError(f"Node ID {node_id} must be a non-negative integer.")
@@ -104,7 +81,6 @@ class BoundaryCondition:
                     raise ValueError(f"Constraint {constraint} at DOF {i} for node {node_id} must be a number or None.")
 
     def _check_loads(self):
-        """Validate the applied_loads dictionary."""
         for node_id, loads in self.applied_loads.items():
             if not isinstance(node_id, int) or node_id < 0:
                 raise ValueError(f"Node ID {node_id} must be a non-negative integer.")
@@ -115,22 +91,18 @@ class BoundaryCondition:
                     raise ValueError(f"Load {load} at DOF {i} for node {node_id} must be a number.")
 
     def apply_load(self, node_id: int, load: Tuple[float, float, float, float, float, float]):
-        """Apply an external load to a specific node."""
         self.applied_loads[node_id] = load
         self._check_loads()
 
     def add_fixed_support(self, node_id: int):
-        """Add a fully fixed support at the specified node."""
         self.fixed_nodes[node_id] = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         self._check_fixed_nodes()
 
     def add_pinned_support(self, node_id: int):
-        """Add a pinned support at the specified node."""
         self.fixed_nodes[node_id] = (0.0, 0.0, 0.0, None, None, None)
         self._check_fixed_nodes()
 
     def get_dof_constraints(self) -> Dict[int, List[bool]]:
-        """Return a dictionary mapping node IDs to a list of boolean flags indicating constrained DOFs."""
         constraints = {}
         for node_id, conditions in self.fixed_nodes.items():
             constraints[node_id] = [cond is not None for cond in conditions]
@@ -140,19 +112,11 @@ class BeamSolver:
     """A class to solve the beam structure for displacements, reactions, and buckling analysis."""
     
     def __init__(self, beam: 'BeamComponent', bc: 'BoundaryCondition'):
-        """
-        Initialize the solver with a beam component and boundary conditions.
-        
-        Args:
-            beam (BeamComponent): The beam structure containing nodes, elements, and material properties.
-            bc (BoundaryCondition): The boundary conditions containing fixed nodes and applied loads.
-        """
         self.beam = beam
         self.bc = bc
         self.internal_forces = None
 
     def build_stiffness_matrix(self) -> np.ndarray:
-        """Assemble the global elastic stiffness matrix for the beam structure."""
         n_nodes = self.beam.nodes.shape[0]
         n_dofs = n_nodes * 6
         K_global = np.zeros((n_dofs, n_dofs))
@@ -164,7 +128,7 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
-            k_local = fu.local_elastic_stiffness_matrix_3D_beam(
+            k_local = mut.local_elastic_stiffness_matrix_3D_beam(
                 self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
@@ -182,7 +146,7 @@ class BeamSolver:
         return K_global
 
     def solve(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Solve for displacements and reaction forces, storing internal forces for buckling analysis."""
+        n_nodes = self.beam.nodes.shape[0]  # Define n_nodes here
         K_global = self.build_stiffness_matrix()
         n_dofs = K_global.shape[0]
         displacements = np.zeros(n_dofs)
@@ -226,7 +190,6 @@ class BeamSolver:
         return displacements_reshaped, reactions_reshaped
 
     def compute_element_forces(self, displacements: np.ndarray) -> Dict[int, np.ndarray]:
-        """Compute internal forces and moments for each element."""
         displacements_flat = displacements.flatten()
         element_forces = {}
 
@@ -237,7 +200,7 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
-            k_local = fu.local_elastic_stiffness_matrix_3D_beam(
+            k_local = mut.local_elastic_stiffness_matrix_3D_beam(
                 self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
@@ -255,7 +218,6 @@ class BeamSolver:
         return element_forces
 
     def display_results(self, displacements: np.ndarray, reactions: np.ndarray):
-        """Print displacements and reactions for each node."""
         for node_idx in range(self.beam.nodes.shape[0]):
             node_id = int(self.beam.nodes[node_idx, 3])
             disp = np.round(displacements[node_idx], 5)
@@ -267,7 +229,6 @@ class BeamSolver:
             print("---")
 
     def build_geometric_stiffness_matrix(self) -> np.ndarray:
-        """Assemble the global geometric stiffness matrix for buckling analysis."""
         if self.internal_forces is None:
             raise ValueError("Must run solve() first to compute internal forces for buckling analysis.")
 
@@ -286,7 +247,7 @@ class BeamSolver:
             forces = self.internal_forces[elem_idx]
             Fx2, Fy1, Fz1, Mx1, My1, Mz1, _, Fy2, Fz2, Mx2, My2, Mz2 = forces
 
-            k_geo = fu.local_geometric_stiffness_matrix_3D_beam(
+            k_geo = mut.local_geometric_stiffness_matrix_3D_beam(
                 L, self.beam.A, Ip, Fx2, Mx2, My1, Mz1, My2, Mz2
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords, [0, 0, 1])
@@ -304,7 +265,6 @@ class BeamSolver:
         return K_geo_global
 
     def solve_buckling(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Solve for critical buckling loads and mode shapes."""
         if self.internal_forces is None:
             self.solve()
 
