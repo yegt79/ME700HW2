@@ -27,15 +27,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov numpy
+          pip install pytest pytest-cov numpy scipy  # Added scipy here
 
       # Set PYTHONPATH correctly for all OS
       - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=src" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=files" >> $GITHUB_ENV  # Points to files/
 
       # Run tests and generate coverage report
       - name: Run tests and generate coverage report
-        run: pytest --cov=src --cov=tests --cov-report=xml:coverage.xml --cov-report=term-missing -v
+        run: pytest files/ --cov=files --cov-report=xml:coverage.xml --cov-report=term-missing -v  # Run and cover files/
 
       # Verify that coverage.xml exists
       - name: Verify coverage.xml exists
