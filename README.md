@@ -1,59 +1,36 @@
-# ME700HW2: 3D Beam Buckling Analysis
+# ME700HW2 - Direct Stiffness Method Implementation
 
-This project implements a 3D beam buckling analysis using the Direct Stiffness Method (DSM) and critical load solver in Python. It calculates critical load factors and buckling mode shapes for a beam structure under compressive loads, based on formulations from *Matrix Structural Analysis* by McGuire et al. (2nd Edition).
+This repository contains my implementation of the Direct Stiffness Method for ME700 Assignment 2, written in Python. It models beam structures in 3D, handles boundary conditions, and performs buckling analysis, with a comprehensive test suite achieving over 90% code coverage.
 
-## Files
+## Features
 
-### 1. `functions.py`
-- **Purpose**: Contains core matrix computation functions for 3D beam elements.
-- **Key Functions**:
-  - `local_elastic_stiffness_matrix_3D_beam(E, nu, A, L, Iy, Iz, J)`: Computes the 12x12 local elastic stiffness matrix for a 3D beam (axial, torsion, and bending terms), per McGuire p. 73.
-  - `rotation_matrix_3D(x1, y1, z1, x2, y2, z2, v_temp=None)`: Calculates the 3x3 rotation matrix from local to global coordinates, handling vertical beams with a reference vector (`v_temp`), per McGuire Ch. 5.1.
-  - `transformation_matrix_3D(gamma)`: Expands a 3x3 rotation matrix into a 12x12 transformation matrix for 3D beam DOFs, per McGuire Ch. 5.1.
-  - `local_geometric_stiffness_matrix_3D_beam(L, A, I_rho, Fx2, Mx2, My1, Mz1, My2, Mz2)`: Computes the 12x12 geometric stiffness matrix with interaction terms, per McGuire p. 258.
-  - `local_geometric_stiffness_matrix_3D_beam_without_interaction_terms(L, A, I_rho, Fx2)`: Simplified geometric stiffness matrix without moment interactions, per McGuire p. 257.
-- **Dependencies**: `numpy`.
+- **BeamComponent**: Represents beam elements with nodes, elements, and material properties (E, ν, A, Iy, Iz, J).
+- **BoundaryCondition**: Manages fixed nodes and applied loads for static and buckling analysis.
+- **BeamSolver**: Solves for displacements, reactions, and buckling modes using the direct stiffness method.
+- **Unit Tests**: Extensive tests in `test_Direct_Stiffness_Method.py` cover input validation, matrix operations, and solver functionality.
 
-### 2. `Direct_Stiffness_Method.py` (DSM)
-- **Purpose**: Implements the Direct Stiffness Method for static analysis of 3D beam structures.
-- **Key Functions**:
-  - `create_node(x, y, z, node_id, bc=None)`: Creates a node dictionary with coordinates, boundary conditions, and zeroed displacement/reaction vectors.
-  - `create_element(node1, node2, E, nu, A, Iy, Iz, J)`: Constructs an element dictionary with material properties, length, rotation matrix, and stiffness matrices (local and global).
-  - `assemble_global_stiffness_matrix(nodes, elements)`: Assembles the global elastic stiffness matrix from element global stiffness matrices.
-  - `assemble_load_vector(nodes, loads)`: Builds the global load vector from applied loads.
-  - `apply_boundary_conditions(nodes, global_stiffness_matrix, load_vector)`: Reduces the system by applying boundary conditions.
-  - `calculate_structure_response(nodes, elements, loads)`: Solves for displacements and reactions, updating node dictionaries.
-- **Dependencies**: `numpy`, `math`, `functions.py`.
+## Installation
 
-### 3. `Elastic_Critical_Solver.py` (ECS)
-- **Purpose**: Computes critical load factors and buckling mode shapes for a 3D beam structure under compressive loads.
-- **Key Class**: `CriticalLoadSolver(nodes, elements, loads, include_interactions=False)`:
-  - `__init__`: Initializes the solver with nodes, elements, loads, and a flag for geometric stiffness interaction terms.
-  - `compute_internal_forces_and_moments(displacements)`: Calculates local forces/moments per element from global displacements.
-  - `assemble_geometric_stiffness(displacements)`: Assembles the global geometric stiffness matrix using `functions.py` routines.
-  - `compute_eigenvalues()`: Solves the eigenvalue problem (K_elastic vs. K_geometric) for critical load factors and mode shapes.
-  - `plot_mode_shape(mode_vec, scale_factor)`: Visualizes the buckling mode in 3D.
-- **Dependencies**: `numpy`, `scipy.linalg`, `matplotlib`, `Direct_Stiffness_Method.py`, `functions.py`.
+To run the code and tests, install the following dependencies. Instructions are provided for macOS/Linux (using a terminal) and Windows (using Command Prompt or PowerShell). A virtual environment is recommended.
 
-### 4. `example_part2.py`
-- **Purpose**: Demonstrates the usage of the above modules with a simple vertical beam buckling problem.
-- **Structure**:
-  - Defines two nodes (fixed base at (0,0,0), free top at (0,0,5)).
-  - Creates one element using `dsm.create_element` with steel properties (E = 200 GPa, A = 0.01 m², etc.).
-  - Applies a 1000 N compressive load downward at the top node.
-  - Runs `CriticalLoadSolver` to compute critical load factors and plot the first buckling mode.
-- **Dependencies**: `numpy`, `Direct_Stiffness_Method.py`, `functions.py`, `Elastic_Critical_Solver.py`.
+### Dependencies
+- **Python 3.13**: Core language (tested with 3.13.1 and 3.13.2).
+- **NumPy**: For matrix operations and numerical computations.
+- **pytest**: For running unit tests.
+- **pytest-cov**: For test coverage reporting.
 
-## Prerequisites
-- Python 3.x
-- Libraries: `numpy`, `scipy`, `matplotlib`
-- Conda environment (optional): Configure as needed.
+### Installation Steps
 
-## Usage
-1. **Setup**:
-   - Place all files (`functions.py`, `Direct_Stiffness_Method.py`, `Elastic_Critical_Solver.py`, `example_part2.py`) in the same directory.
-   - Ensure your Python environment has the required libraries installed.
+1. **Install Python 3.13**
+   - **macOS/Linux**: 
+     - Use Homebrew: `brew install python@3.13` or download from [python.org](https://www.python.org/downloads/).
+     - Verify: `python3 --version` (should show 3.13.x).
+   - **Windows**: 
+     - Download from [python.org](https://www.python.org/downloads/), install with "Add Python to PATH" checked.
+     - Verify: `python --version` or `py -3.13 --version`.
 
-2. **Run the Example**:
-   ```bash
-   /projectnb/me700/students/yegt/.conda/envs/env2/bin/python /usr4/me700/yegt/ME700HW2-8/src/example1.py
+2. **Set Up a Virtual Environment** (Recommended)
+   - **macOS/Linux**:
+     ```bash
+     python3 -m venv venv
+     source venv/bin/activate
