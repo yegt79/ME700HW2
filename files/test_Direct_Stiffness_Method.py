@@ -163,7 +163,7 @@ def test_display_results(simple_beam, simple_bc, capsys):
 
 def test_display_buckling_no_modes(simple_beam, simple_bc, capsys):
     solver = BeamSolver(simple_beam, simple_bc)
-    simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    simple_bc.apply_load(1, (1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
     solver.solve()
     eigvals, eigvecs, buckling_forces = solver.solve_buckling()
     solver.display_buckling_results(eigvals, eigvecs, buckling_forces)
@@ -172,7 +172,7 @@ def test_display_buckling_no_modes(simple_beam, simple_bc, capsys):
 
 def test_solve_buckling(simple_beam, simple_bc):
     solver = BeamSolver(simple_beam, simple_bc)
-    simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    simple_bc.apply_load(1, (1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
     solver.solve()
     eigvals, eigvecs, buckling_forces = solver.solve_buckling()
     assert isinstance(eigvals, np.ndarray)
@@ -185,7 +185,7 @@ def test_display_buckling_with_modes(simple_beam, simple_bc, capsys):
     with patch('numpy.isreal', return_value=np.array([True, True])):
         with patch('numpy.argsort', return_value=np.array([0, 1])):
             solver = BeamSolver(simple_beam, simple_bc)
-            simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+            simple_bc.apply_load(1, (1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
             solver.solve()
             eigvals = np.array([1.0, 2.0])
             eigvecs = np.zeros((12, 2))
