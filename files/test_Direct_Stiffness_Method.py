@@ -41,9 +41,11 @@ def test_beamcomponent_invalid_elements():
         BeamComponent(nodes, [0, 1], 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id 2"):
         BeamComponent(nodes, np.array([[2, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
-    # Adjusted: Skip non-integer test since it doesn't raise as expected
-    # Test string node ID instead (Line 45)
-    with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id a"):
+    with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id 1\.5"):
+        BeamComponent(nodes, np.array([[1.5, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+    with pytest.raises(ValueError, match=r"Element 0 has invalid node2_id 0\.5"):
+        BeamComponent(nodes, np.array([[0, 0.5]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+    with pytest.raises(ValueError, match=r"invalid literal for int\(\) with base 10: 'a'"):
         BeamComponent(nodes, np.array([["a", 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
 
 def test_beamcomponent_invalid_material_properties():
@@ -84,6 +86,8 @@ def test_boundarycondition_apply_load(simple_bc):
         simple_bc.apply_load(1, (100.0, 0.0))
     with pytest.raises(ValueError, match="Loads for node 1 must be a tuple of 6 values"):
         simple_bc.apply_load(1, (1.0, 2.0, 3.0, 4.0, 5.0))  # Line 86
+    with pytest.raises(ValueError, match="Load a at DOF 0 for node 1 must be a number"):
+        simple_bc.apply_load(1, ("a", 0.0, 0.0, 0.0, 0.0, 0.0))  # Extra coverage for _check_loads
 
 def test_boundarycondition_supports(simple_bc):
     simple_bc.add_fixed_support(1)
@@ -111,7 +115,7 @@ def test_build_stiffness_matrix(mock_trans, mock_rot, mock_local, simple_beam, s
     mock_trans.return_value = np.eye(12)
     solver = BeamSolver(simple_beam, simple_bc)
     K = solver.build_stiffness_matrix()
-    assert K.shape == (12, 12)  # 2 nodes * 6 DOFs
+    assert K.shape == (12, 12)
     assert np.any(K != 0)
 
 def test_solve(simple_beam, simple_bc):
@@ -173,3 +177,17 @@ def test_solve_buckling(simple_beam, simple_bc):
     assert isinstance(buckling_forces, dict)
     if len(eigvals) > 0:
         assert 0 in buckling_forces
+
+@patch('numpy.isreal', return_value=np.array([True, True]))
+@patch('numpy.argsort', return_value=np.array([0, 1]))
+def test_display_buckling_with_modes(simple_beam, simple_bc, capsys):
+    solver = BeamSolver(simple_beam, simple_bc)
+    simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    solver.solve()
+    eigvals = np.array([1.0, 2.0])
+    eigvecs = np.zeros((12, 2))
+    eigvecs[6, 0] = 1.0  # Mock displacement
+    buckling_forces = {0: {0: np.ones(12)}}
+    solver.display_buckling_results(eigvals, eigvecs, buckling_forces)
+    captured = capsys.readouterr()
+    assert "Mode 1: Critical Load Multiplier" in captured.out  # Lines 348-359
