@@ -181,13 +181,15 @@ def test_solve_buckling(simple_beam, simple_bc):
 @patch('numpy.isreal', return_value=np.array([True, True]))
 @patch('numpy.argsort', return_value=np.array([0, 1]))
 def test_display_buckling_with_modes(simple_beam, simple_bc, capsys):
-    solver = BeamSolver(simple_beam, simple_bc)
-    simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    solver.solve()
-    eigvals = np.array([1.0, 2.0])
-    eigvecs = np.zeros((12, 2))
-    eigvecs[6, 0] = 1.0  # Mock displacement
-    buckling_forces = {0: {0: np.ones(12)}}
-    solver.display_buckling_results(eigvals, eigvecs, buckling_forces)
-    captured = capsys.readouterr()
-    assert "Mode 1: Critical Load Multiplier" in captured.out  # Lines 348-359
+    with patch('numpy.isreal', return_value=np.array([True, True])):
+        with patch('numpy.argsort', return_value=np.array([0, 1])):
+            solver = BeamSolver(simple_beam, simple_bc)
+            simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+            solver.solve()
+            eigvals = np.array([1.0, 2.0])
+            eigvecs = np.zeros((12, 2))
+            eigvecs[6, 0] = 1.0  # Mock displacement
+            buckling_forces = {0: {0: np.ones(12)}}
+            solver.display_buckling_results(eigvals, eigvecs, buckling_forces)
+            captured = capsys.readouterr()
+            assert "Mode 1: Critical Load Multiplier" in captured.out  # Lines 348-359
