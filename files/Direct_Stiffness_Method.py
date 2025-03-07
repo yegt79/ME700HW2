@@ -6,18 +6,26 @@ from functions import rotation_matrix_3D, transformation_matrix_3D
 from typing import List, Dict, Tuple, Optional
 
 class BeamComponent:
-    def __init__(self, nodes: np.ndarray, elements: np.ndarray, E: float, nu: float, A: float, Iy: float, Iz: float, J: float):
+    def __init__(self, nodes: np.ndarray, elements: np.ndarray, properties: List[Dict[str, float]]):
+        """
+        Initialize BeamComponent with per-element properties.
+        
+        Args:
+            nodes: Array of node coordinates and IDs [x, y, z, id]
+            elements: Array of element connectivity [node1_id, node2_id]
+            properties: List of dictionaries, each containing E, nu, A, Iy, Iz, J for each element
+        """
         self.nodes = np.array(nodes, dtype=float)
         self.elements_raw = elements
         self._validate_inputs()
         self.elements = np.array(elements, dtype=int)
-        self.E = E
-        self.nu = nu
-        self.A = A
-        self.Iy = Iy
-        self.Iz = Iz
-        self.J = J
+        
+        # Ensure properties match the number of elements
+        if len(properties) != len(elements):
+            raise ValueError(f"Number of property sets ({len(properties)}) must match number of elements ({len(elements)}).")
+        self.properties = properties  # List of dicts: [{'E': float, 'nu': float, 'A': float, 'Iy': float, 'Iz': float, 'J': float}, ...]
         self._validate_material_properties()
+        
         self.bc = np.full((self.nodes.shape[0], 6), False)
         self.displacements = np.zeros((self.nodes.shape[0], 6))
         self.reactions = np.zeros((self.nodes.shape[0], 6))
@@ -36,25 +44,28 @@ class BeamComponent:
         max_node_id = int(self.nodes[:, 3].max())
         for i, element in enumerate(self.elements_raw):
             node1_id, node2_id = element
-            # Accept floats that are whole numbers
             if (not isinstance(node1_id, (int, np.integer)) and not (isinstance(node1_id, float) and node1_id.is_integer())) or node1_id < 0 or node1_id > max_node_id or node1_id not in valid_node_ids:
                 raise ValueError(f"Element {i} has invalid node1_id {node1_id}; must be an integer in nodes array (max {max_node_id}).")
             if (not isinstance(node2_id, (int, np.integer)) and not (isinstance(node2_id, float) and node2_id.is_integer())) or node2_id < 0 or node2_id > max_node_id or node2_id not in valid_node_ids:
                 raise ValueError(f"Element {i} has invalid node2_id {node2_id}; must be an integer in nodes array (max {max_node_id}).")
 
     def _validate_material_properties(self):
-        if not isinstance(self.E, (int, float)) or self.E <= 0:
-            raise ValueError(f"Young's Modulus (E) must be positive, got {self.E}.")
-        if not isinstance(self.nu, (int, float)) or self.nu < -1 or self.nu > 0.5:
-            raise ValueError(f"Poisson's Ratio (nu) must be between -1 and 0.5, got {self.nu}.")
-        if not isinstance(self.A, (int, float)) or self.A <= 0:
-            raise ValueError(f"Cross-sectional area (A) must be positive, got {self.A}.")
-        if not isinstance(self.Iy, (int, float)) or self.Iy <= 0:
-            raise ValueError(f"Moment of inertia about y-axis (Iy) must be positive, got {self.Iy}.")
-        if not isinstance(self.Iz, (int, float)) or self.Iz <= 0:
-            raise ValueError(f"Moment of inertia about z-axis (Iz) must be positive, got {self.Iz}.")
-        if not isinstance(self.J, (int, float)) or self.J <= 0:
-            raise ValueError(f"Polar moment of inertia (J) must be positive, got {self.J}.")
+        required_keys = {'E', 'nu', 'A', 'Iy', 'Iz', 'J'}
+        for i, props in enumerate(self.properties):
+            if not isinstance(props, dict) or set(props.keys()) != required_keys:
+                raise ValueError(f"Properties for element {i} must be a dict with keys {required_keys}, got {props}.")
+            if not isinstance(props['E'], (int, float)) or props['E'] <= 0:
+                raise ValueError(f"Element {i}: Young's Modulus (E) must be positive, got {props['E']}.")
+            if not isinstance(props['nu'], (int, float)) or props['nu'] < -1 or props['nu'] > 0.5:
+                raise ValueError(f"Element {i}: Poisson's Ratio (nu) must be between -1 and 0.5, got {props['nu']}.")
+            if not isinstance(props['A'], (int, float)) or props['A'] <= 0:
+                raise ValueError(f"Element {i}: Cross-sectional area (A) must be positive, got {props['A']}.")
+            if not isinstance(props['Iy'], (int, float)) or props['Iy'] <= 0:
+                raise ValueError(f"Element {i}: Moment of inertia about y-axis (Iy) must be positive, got {props['Iy']}.")
+            if not isinstance(props['Iz'], (int, float)) or props['Iz'] <= 0:
+                raise ValueError(f"Element {i}: Moment of inertia about z-axis (Iz) must be positive, got {props['Iz']}.")
+            if not isinstance(props['J'], (int, float)) or props['J'] <= 0:
+                raise ValueError(f"Element {i}: Polar moment of inertia (J) must be positive, got {props['J']}.")
 
     def _compute_element_properties(self):
         pass
@@ -113,7 +124,7 @@ class BeamSolver:
         self.beam = beam
         self.bc = bc
         self.internal_forces = None
-        self.buckling_forces = {}  # Added for buckling mode forces
+        self.buckling_forces = {}
 
     def build_stiffness_matrix(self) -> np.ndarray:
         n_nodes = self.beam.nodes.shape[0]
@@ -127,8 +138,9 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
+            props = self.beam.properties[elem_idx]  # Get properties for this element
             k_local = fu.local_elastic_stiffness_matrix_3D_beam(
-                self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
+                props['E'], props['nu'], props['A'], L, props['Iy'], props['Iz'], props['J']
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
@@ -199,8 +211,9 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
+            props = self.beam.properties[elem_idx]  # Use element-specific properties
             k_local = fu.local_elastic_stiffness_matrix_3D_beam(
-                self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
+                props['E'], props['nu'], props['A'], L, props['Iy'], props['Iz'], props['J']
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
@@ -242,12 +255,13 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
-            Ip = self.beam.Iy + self.beam.Iz
+            props = self.beam.properties[elem_idx]  # Use element-specific properties
+            Ip = props['Iy'] + props['Iz']
             forces = self.internal_forces[elem_idx]
             Fx2, Fy1, Fz1, Mx1, My1, Mz1, _, Fy2, Fz2, Mx2, My2, Mz2 = forces
 
             k_geo = fu.local_geometric_stiffness_matrix_3D_beam(
-                L, self.beam.A, Ip, Fx2, Mx2, My1, Mz1, My2, Mz2
+                L, props['A'], Ip, Fx2, Mx2, My1, Mz1, My2, Mz2
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
@@ -263,7 +277,6 @@ class BeamSolver:
 
         return K_geo_global
 
-    # Added method for buckling forces computation
     def compute_buckling_mode_forces(self, mode_displacements: np.ndarray) -> Dict[int, np.ndarray]:
         """Compute internal forces for a given buckling mode displacement vector."""
         displacements_flat = mode_displacements.flatten()
@@ -276,8 +289,9 @@ class BeamSolver:
             node2_coords = self.beam.nodes[node2_idx, :3]
 
             L = np.linalg.norm(node2_coords - node1_coords)
+            props = self.beam.properties[elem_idx]  # Use element-specific properties
             k_local = fu.local_elastic_stiffness_matrix_3D_beam(
-                self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
+                props['E'], props['nu'], props['A'], L, props['Iy'], props['Iz'], props['J']
             )
             gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
             T = transformation_matrix_3D(gamma)
@@ -293,7 +307,6 @@ class BeamSolver:
 
         return element_forces
 
-    # Updated solve_buckling to return three values
     def solve_buckling(self) -> Tuple[np.ndarray, np.ndarray, Dict[int, Dict[int, np.ndarray]]]:
         """Solve for buckling eigenvalues, eigenvectors, and corresponding internal forces."""
         if self.internal_forces is None:
@@ -316,7 +329,7 @@ class BeamSolver:
         K_e_ff = K_elastic[np.ix_(unknown_dofs, unknown_dofs)]
         K_g_ff = K_geo[np.ix_(unknown_dofs, unknown_dofs)]
 
-        eigvals, eigvecs = sp.eig(K_e_ff, K_g_ff)  # Your original convention
+        eigvals, eigvecs = sp.eig(K_e_ff, K_g_ff)
 
         real_pos_mask = np.isreal(eigvals) & (eigvals > 0)
         filtered_eigvals = np.real(eigvals[real_pos_mask])
@@ -326,24 +339,22 @@ class BeamSolver:
         filtered_eigvals = filtered_eigvals[sorted_inds]
         filtered_eigvecs = filtered_eigvecs[:, sorted_inds]
 
-        # Compute buckling forces
         n_nodes = self.beam.nodes.shape[0]
         buckling_forces = {}
         full_eigvecs = np.zeros((n_dofs, filtered_eigvals.size))
         full_eigvecs[unknown_dofs, :] = filtered_eigvecs
-        for mode_idx in range(min(3, filtered_eigvals.size)):  # Compute for first 3 modes
+        for mode_idx in range(min(3, filtered_eigvals.size)):
             mode_displacements = full_eigvecs[:, mode_idx].reshape(n_nodes, 6)
             buckling_forces[mode_idx] = self.compute_buckling_mode_forces(mode_displacements)
 
         self.buckling_forces = buckling_forces
         return filtered_eigvals, full_eigvecs, buckling_forces
 
-    # Updated to display only first mode
     def display_buckling_results(self, eigvals: np.ndarray, eigvecs: np.ndarray, buckling_forces: Dict[int, Dict[int, np.ndarray]]):
         """Display buckling eigenvalue, mode shape, and internal forces for the first mode only."""
         print("\nBuckling Analysis Results (First Mode):")
         if len(eigvals) > 0:
-            mode_idx = 0  # First mode only
+            mode_idx = 0
             print(f"Mode 1: Critical Load Multiplier = {eigvals[mode_idx]:.5f}")
             print("Mode Shape (Displacements):")
             mode_disp = eigvecs[:, mode_idx].reshape(self.beam.nodes.shape[0], 6)
