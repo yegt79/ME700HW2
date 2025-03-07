@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ME700"
+version = "0.0.0"
+authors = [
+    { name = "YeganehTaheri", email = "yegt@bu.edu" },
+]
+description = "assignment 2"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "matplotlib>=3.3.0,<3.5.0",  # Matplotlib version that should work with Python 3.9
+    "numpy==1.26.4",
+    "pytest==7.1.2",
+    "pytest-cov==3.0.0",
+    "scipy==1.12.0"
+]
