@@ -9,7 +9,15 @@ from unittest.mock import patch
 def simple_beam():
     nodes = np.array([[0.0, 0.0, 0.0, 0], [1.0, 0.0, 0.0, 1]])
     elements = np.array([[0, 1]])
-    return BeamComponent(nodes, elements, E=200e9, nu=0.3, A=0.01, Iy=1e-4, Iz=1e-4, J=2e-4)
+    properties = [{
+        'E': 200e9,
+        'nu': 0.3,
+        'A': 0.01,
+        'Iy': 1e-4,
+        'Iz': 1e-4,
+        'J': 2e-4
+    }]
+    return BeamComponent(nodes, elements, properties)
 
 @pytest.fixture
 def simple_bc():
@@ -20,48 +28,54 @@ def simple_bc():
 def test_beamcomponent_init_valid(simple_beam):
     assert simple_beam.nodes.shape == (2, 4)
     assert simple_beam.elements.shape == (1, 2)
-    assert simple_beam.E == 200e9
+    # Changed to check properties list instead of individual attributes
+    assert simple_beam.properties[0]['E'] == 200e9
     assert simple_beam.bc.shape == (2, 6)
     assert np.all(simple_beam.displacements == 0)
 
 def test_beamcomponent_invalid_nodes():
+    properties = [{'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4}]
     with pytest.raises(ValueError, match=r"Nodes must be a 2D array with shape \(n_nodes, 4\), got \(3,\)\."):
-        BeamComponent([1, 2, 3], np.array([[0, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent([1, 2, 3], np.array([[0, 1]]), properties)
     with pytest.raises(ValueError, match=r"Nodes must be a 2D array with shape \(n_nodes, 4\), got \(3,\)\."):
-        BeamComponent(np.array([1, 2, 3]), np.array([[0, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(np.array([1, 2, 3]), np.array([[0, 1]]), properties)
     with pytest.raises(ValueError, match=r"Nodes must be a 2D array with shape \(n_nodes, 4\), got \(2, 3\)\."):
-        BeamComponent(np.array([[0, 0, 0], [1, 0, 0]]), np.array([[0, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(np.array([[0, 0, 0], [1, 0, 0]]), np.array([[0, 1]]), properties)
 
 def test_beamcomponent_invalid_elements():
     nodes = np.array([[0.0, 0.0, 0.0, 0], [1.0, 0.0, 0.0, 1]])
+    properties = [{'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4}]
     with pytest.raises(ValueError, match=r"Elements must be a NumPy array, got <class 'list'>"):
-        BeamComponent(nodes, [0, 1], 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(nodes, [0, 1], properties)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id 2"):
-        BeamComponent(nodes, np.array([[2, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(nodes, np.array([[2, 1]]), properties)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id 1\.5"):
-        BeamComponent(nodes, np.array([[1.5, 1]], dtype=float), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(nodes, np.array([[1.5, 1]], dtype=float), properties)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node2_id 0\.5"):
-        BeamComponent(nodes, np.array([[0, 0.5]], dtype=float), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(nodes, np.array([[0, 0.5]], dtype=float), properties)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node2_id 0\.5"):
-        BeamComponent(nodes, np.array([[1, 0.5]], dtype=float), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+        BeamComponent(nodes, np.array([[1, 0.5]], dtype=float), properties)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id a"):  # Updated regex
-        BeamComponent(nodes, np.array([["a", "1"]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
-        
+        BeamComponent(nodes, np.array([["a", "1"]]), properties)
+
 def test_beamcomponent_invalid_material_properties():
     nodes = np.array([[0.0, 0.0, 0.0, 0], [1.0, 0.0, 0.0, 1]])
     elements = np.array([[0, 1]])
-    with pytest.raises(ValueError, match="Young's Modulus"):
-        BeamComponent(nodes, elements, -200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
-    with pytest.raises(ValueError, match="Poisson's Ratio"):
-        BeamComponent(nodes, elements, 200e9, 1.0, 0.01, 1e-4, 1e-4, 2e-4)
-    with pytest.raises(ValueError, match="Cross-sectional area"):
-        BeamComponent(nodes, elements, 200e9, 0.3, -0.01, 1e-4, 1e-4, 2e-4)
-    with pytest.raises(ValueError, match="Moment of inertia about y-axis"):
-        BeamComponent(nodes, elements, 200e9, 0.3, 0.01, -1e-4, 1e-4, 2e-4)
-    with pytest.raises(ValueError, match="Moment of inertia about z-axis"):
-        BeamComponent(nodes, elements, 200e9, 0.3, 0.01, 1e-4, -1e-4, 2e-4)
-    with pytest.raises(ValueError, match="Polar moment of inertia"):
-        BeamComponent(nodes, elements, 200e9, 0.3, 0.01, 1e-4, 1e-4, -2e-4)
+    with pytest.raises(ValueError, match="Element 0: Young's Modulus"):
+        BeamComponent(nodes, elements, [{'E': -200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4}])
+    with pytest.raises(ValueError, match="Element 0: Poisson's Ratio"):
+        BeamComponent(nodes, elements, [{'E': 200e9, 'nu': 1.0, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4}])
+    with pytest.raises(ValueError, match="Element 0: Cross-sectional area"):
+        BeamComponent(nodes, elements, [{'E': 200e9, 'nu': 0.3, 'A': -0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4}])
+    with pytest.raises(ValueError, match="Element 0: Moment of inertia about y-axis"):
+        BeamComponent(nodes, elements, [{'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': -1e-4, 'Iz': 1e-4, 'J': 2e-4}])
+    with pytest.raises(ValueError, match="Element 0: Moment of inertia about z-axis"):
+        BeamComponent(nodes, elements, [{'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': -1e-4, 'J': 2e-4}])
+    with pytest.raises(ValueError, match="Element 0: Polar moment of inertia"):
+        BeamComponent(nodes, elements, [{'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': -2e-4}])
+    with pytest.raises(ValueError, match=r"Number of property sets \(2\) must match number of elements \(1\)\."):
+        BeamComponent(nodes, elements, [{'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4},
+                                       {'E': 200e9, 'nu': 0.3, 'A': 0.01, 'Iy': 1e-4, 'Iz': 1e-4, 'J': 2e-4}])
 
 def test_compute_element_properties(simple_beam):
     props = simple_beam.element_properties
