@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def local_elastic_stiffness_matrix_3D_beam(E: float, nu: float, A: float, L: float, Iy: float, Iz: float, J: float) -> np.ndarray:
     """
     local element elastic stiffness matrix
@@ -86,47 +85,51 @@ def check_parallel(vec_1: np.ndarray, vec_2: np.ndarray):
         return
 
 
-def rotation_matrix_3D(x1: float, y1: float, z1: float, x2: float, y2: float, z2: float, v_temp: np.ndarray = None) -> np.ndarray:
+def rotation_matrix_3D(x1: float, y1: float, z1: float, x2: float, y2: float, z2: float, v_temp: np.ndarray = None):
     """
-    3D rotation matrix with robust reference vector selection.
+    3D rotation matrix
+    source: Chapter 5.1 of McGuire's Matrix Structural Analysis 2nd Edition
+    Given:
+        x, y, z coordinates of the ends of two beams: x1, y1, z1, x2, y2, z2
+        optional: reference z vector direction v_temp to orthonormalize the local y and z axis
+            if v_temp is not given, VVVV
+    Compute:
+        where l, m, n are defined as direction cosines:
+        gamma = [[lx'=cos alpha_x', mx'=cos beta_x', nx'=cos gamma_x'],
+                 [ly'=cos alpha_y', my'=cos beta_y', ny'=cos gamma_y'],
+                 [lz'=cos alpha_z', mz'=cos beta_z', nz'=cos gamma_z']]
     """
     L = np.sqrt((x2 - x1) ** 2.0 + (y2 - y1) ** 2.0 + (z2 - z1) ** 2.0)
     lxp = (x2 - x1) / L
     mxp = (y2 - y1) / L
     nxp = (z2 - z1) / L
-    local_x = np.array([lxp, mxp, nxp])
+    local_x = np.asarray([lxp, mxp, nxp])
 
-    # If v_temp is provided, use it; otherwise, select a non-parallel vector
-    if v_temp is not None:
-        check_unit_vector(v_temp)
-        if np.allclose(np.dot(local_x, v_temp), 1.0) or np.allclose(np.dot(local_x, v_temp), -1.0):
-            raise ValueError("Provided v_temp is parallel to beam axis.")
-        ref_vec = v_temp
+    # choose a vector to orthonormalize the y axis if one is not given
+    if v_temp is None:
+        # if the beam is oriented vertically, switch to the global y axis
+        if np.isclose(lxp, 0.0) and np.isclose(mxp, 0.0):
+            v_temp = np.array([0, 1.0, 0.0])
+        else:
+            # otherwise use the global z axis
+            v_temp = np.array([0, 0, 1.0])
     else:
-        # Choose a reference vector based on beam orientation
-        if abs(lxp) > abs(mxp) and abs(lxp) > abs(nxp):  # Beam mostly along x-axis
-            ref_vec = np.array([0, 0, 1.0])  # Use global z-axis
-        elif abs(mxp) > abs(lxp) and abs(mxp) > abs(nxp):  # Beam mostly along y-axis
-            ref_vec = np.array([0, 0, 1.0])  # Use global z-axis
-        else:  # Beam mostly along z-axis
-            ref_vec = np.array([1, 0, 0.0])  # Use global x-axis
-
-    # Compute local z-axis (perpendicular to local_x and ref_vec)
-    local_z = np.cross(local_x, ref_vec)
-    if np.allclose(local_z, 0):
-        # If ref_vec was parallel, try an alternative
-        ref_vec = np.array([0, 1, 0]) if not np.allclose(ref_vec, [0, 1, 0]) else np.array([1, 0, 0])
-        local_z = np.cross(local_x, ref_vec)
-        if np.allclose(local_z, 0):
-            raise ValueError("Unable to find a non-parallel reference vector.")
-    local_z = local_z / np.linalg.norm(local_z)
-
-    # Compute local y-axis
-    local_y = np.cross(local_z, local_x)
+        # check to make sure that given v_temp is a unit vector
+        check_unit_vector(v_temp)
+        # check to make sure that given v_temp is not parallel to the local x axis
+        check_parallel(local_x, v_temp)
+    
+    # compute the local y axis
+    local_y = np.cross(v_temp, local_x)
     local_y = local_y / np.linalg.norm(local_y)
 
-    # Rotation matrix
-    gamma = np.array([local_x, local_y, local_z])
+    # compute the local z axis
+    local_z = np.cross(local_x, local_y)
+    local_z = local_z / np.linalg.norm(local_z)
+
+    # assemble R
+    gamma = np.vstack((local_x, local_y, local_z))
+    
     return gamma
 
 
