@@ -40,11 +40,11 @@ def test_beamcomponent_invalid_elements():
         BeamComponent(nodes, np.array([[2, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id 1\.5"):
         BeamComponent(nodes, np.array([[1.5, 1]], dtype=float), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
-    with pytest.raises(ValueError, match=r"Element 0 has invalid node2_id 0\.5"):  # Updated regex
+    with pytest.raises(ValueError, match=r"Element 0 has invalid node2_id 0\.5"):
         BeamComponent(nodes, np.array([[0, 0.5]], dtype=float), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
     with pytest.raises(ValueError, match=r"Element 0 has invalid node2_id 0\.5"):
         BeamComponent(nodes, np.array([[1, 0.5]], dtype=float), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
-    with pytest.raises(ValueError, match=r"invalid literal for int\(\) with base 10: 'a'"):
+    with pytest.raises(ValueError, match=r"Element 0 has invalid node1_id a"):  # Updated regex
         BeamComponent(nodes, np.array([["a", "1"]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
         
 def test_beamcomponent_invalid_material_properties():
