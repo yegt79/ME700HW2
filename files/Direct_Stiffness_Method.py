@@ -6,38 +6,35 @@ from functions import rotation_matrix_3D, transformation_matrix_3D
 from typing import List, Dict, Tuple, Optional
 
 class BeamComponent:
-    """A class representing a 3D beam structure with nodes and elements."""
-    
-    def __init__(self, nodes: np.ndarray, elements: np.ndarray, 
-                 E: float, nu: float, A: float, Iy: float, Iz: float, J: float):
+    def __init__(self, nodes: np.ndarray, elements: np.ndarray, E: float, nu: float, A: float, Iy: float, Iz: float, J: float):
         self.nodes = np.array(nodes, dtype=float)
-        self.elements = np.array(elements, dtype=int)
+        self.elements_raw = elements  # Store raw input
+        self._validate_inputs()  # Validate before conversion
+        self.elements = np.array(elements, dtype=int)  # Convert after validation
         self.E = E
         self.nu = nu
         self.A = A
         self.Iy = Iy
         self.Iz = Iz
         self.J = J
-        
         self._validate_material_properties()
         self.bc = np.full((self.nodes.shape[0], 6), False)
         self.displacements = np.zeros((self.nodes.shape[0], 6))
         self.reactions = np.zeros((self.nodes.shape[0], 6))
         self.element_properties = self._compute_element_properties()
-        self._validate_inputs()
 
     def _validate_inputs(self):
         if not isinstance(self.nodes, np.ndarray):
             raise ValueError(f"Nodes must be a NumPy array, got {type(self.nodes)}.")
         if self.nodes.ndim != 2 or self.nodes.shape[1] != 4:
             raise ValueError(f"Nodes must be a 2D array with shape (n_nodes, 4), got {self.nodes.shape}.")
-        if not isinstance(self.elements, np.ndarray):
-            raise ValueError(f"Elements must be a NumPy array, got {type(self.elements)}.")
-        if self.elements.ndim != 2 or self.elements.shape[1] != 2:
-            raise ValueError(f"Elements must be a 2D array with shape (n_elements, 2), got {self.elements.shape}.")
+        if not isinstance(self.elements_raw, np.ndarray):
+            raise ValueError(f"Elements must be a NumPy array, got {type(self.elements_raw)}.")
+        if self.elements_raw.ndim != 2 or self.elements_raw.shape[1] != 2:
+            raise ValueError(f"Elements must be a 2D array with shape (n_elements, 2), got {self.elements_raw.shape}.")
         valid_node_ids = set(self.nodes[:, 3].astype(int))
         max_node_id = int(self.nodes[:, 3].max())
-        for i, element in enumerate(self.elements):
+        for i, element in enumerate(self.elements_raw):
             node1_id, node2_id = element
             if not isinstance(node1_id, (int, np.integer)) or (isinstance(node1_id, float) and not node1_id.is_integer()) or node1_id < 0 or node1_id > max_node_id or node1_id not in valid_node_ids:
                 raise ValueError(f"Element {i} has invalid node1_id {node1_id}; must be an integer in nodes array (max {max_node_id}).")
