@@ -8,9 +8,9 @@ from typing import List, Dict, Tuple, Optional
 class BeamComponent:
     def __init__(self, nodes: np.ndarray, elements: np.ndarray, E: float, nu: float, A: float, Iy: float, Iz: float, J: float):
         self.nodes = np.array(nodes, dtype=float)
-        self.elements_raw = elements  # Store raw input
-        self._validate_inputs()  # Validate before conversion
-        self.elements = np.array(elements, dtype=int)  # Convert after validation
+        self.elements_raw = elements
+        self._validate_inputs()
+        self.elements = np.array(elements, dtype=int)
         self.E = E
         self.nu = nu
         self.A = A
@@ -36,9 +36,10 @@ class BeamComponent:
         max_node_id = int(self.nodes[:, 3].max())
         for i, element in enumerate(self.elements_raw):
             node1_id, node2_id = element
-            if not isinstance(node1_id, (int, np.integer)) or (isinstance(node1_id, float) and not node1_id.is_integer()) or node1_id < 0 or node1_id > max_node_id or node1_id not in valid_node_ids:
+            # Accept floats that are whole numbers
+            if (not isinstance(node1_id, (int, np.integer)) and not (isinstance(node1_id, float) and node1_id.is_integer())) or node1_id < 0 or node1_id > max_node_id or node1_id not in valid_node_ids:
                 raise ValueError(f"Element {i} has invalid node1_id {node1_id}; must be an integer in nodes array (max {max_node_id}).")
-            if not isinstance(node2_id, (int, np.integer)) or (isinstance(node2_id, float) and not node2_id.is_integer()) or node2_id < 0 or node2_id > max_node_id or node2_id not in valid_node_ids:
+            if (not isinstance(node2_id, (int, np.integer)) and not (isinstance(node2_id, float) and node2_id.is_integer())) or node2_id < 0 or node2_id > max_node_id or node2_id not in valid_node_ids:
                 raise ValueError(f"Element {i} has invalid node2_id {node2_id}; must be an integer in nodes array (max {max_node_id}).")
 
     def _validate_material_properties(self):
