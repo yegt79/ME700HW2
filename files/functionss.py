@@ -280,3 +280,4 @@ def local_geometric_stiffness_matrix_3D_beam_without_interaction_terms(L, A, I_r
     k_g[10, 10] = 2.0 * Fx2 * L / 15.0
     k_g[11, 11] = 2.0 * Fx2 * L / 15.0
     return k_g
+    
