@@ -316,7 +316,7 @@ class BeamSolver:
         K_e_ff = K_elastic[np.ix_(unknown_dofs, unknown_dofs)]
         K_g_ff = K_geo[np.ix_(unknown_dofs, unknown_dofs)]
 
-        eigvals, eigvecs = sp.eig(K_e_ff, -K_g_ff)  # Your original convention
+        eigvals, eigvecs = sp.eig(K_e_ff, K_g_ff)  # Your original convention
 
         real_pos_mask = np.isreal(eigvals) & (eigvals > 0)
         filtered_eigvals = np.real(eigvals[real_pos_mask])
