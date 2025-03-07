@@ -39,10 +39,10 @@ class BeamComponent:
         max_node_id = int(self.nodes[:, 3].max())
         for i, element in enumerate(self.elements):
             node1_id, node2_id = element
-            if not isinstance(node1_id, (int, np.integer)) or node1_id < 0 or node1_id > max_node_id or node1_id not in valid_node_ids:
-                raise ValueError(f"Element {i} has invalid node1_id {node1_id}; must be in nodes array (max {max_node_id}).")
-            if not isinstance(node2_id, (int, np.integer)) or node2_id < 0 or node2_id > max_node_id or node2_id not in valid_node_ids:
-                raise ValueError(f"Element {i} has invalid node2_id {node2_id}; must be in nodes array (max {max_node_id}).")
+            if not isinstance(node1_id, (int, np.integer)) or (isinstance(node1_id, float) and not node1_id.is_integer()) or node1_id < 0 or node1_id > max_node_id or node1_id not in valid_node_ids:
+                raise ValueError(f"Element {i} has invalid node1_id {node1_id}; must be an integer in nodes array (max {max_node_id}).")
+            if not isinstance(node2_id, (int, np.integer)) or (isinstance(node2_id, float) and not node2_id.is_integer()) or node2_id < 0 or node2_id > max_node_id or node2_id not in valid_node_ids:
+                raise ValueError(f"Element {i} has invalid node2_id {node2_id}; must be an integer in nodes array (max {max_node_id}).")
 
     def _validate_material_properties(self):
         if not isinstance(self.E, (int, float)) or self.E <= 0:
