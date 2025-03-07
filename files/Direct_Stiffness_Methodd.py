@@ -115,7 +115,6 @@ class BeamSolver:
         self.beam = beam
         self.bc = bc
         self.internal_forces = None
-        self.buckling_forces = {}  # Store forces for buckling modes
 
     def build_stiffness_matrix(self) -> np.ndarray:
         n_nodes = self.beam.nodes.shape[0]
@@ -147,7 +146,7 @@ class BeamSolver:
         return K_global
 
     def solve(self) -> Tuple[np.ndarray, np.ndarray]:
-        n_nodes = self.beam.nodes.shape[0]
+        n_nodes = self.beam.nodes.shape[0]  # Define n_nodes here
         K_global = self.build_stiffness_matrix()
         n_dofs = K_global.shape[0]
         displacements = np.zeros(n_dofs)
@@ -191,7 +190,6 @@ class BeamSolver:
         return displacements_reshaped, reactions_reshaped
 
     def compute_element_forces(self, displacements: np.ndarray) -> Dict[int, np.ndarray]:
-        """Compute elastic internal forces for given displacements."""
         displacements_flat = displacements.flatten()
         element_forces = {}
 
@@ -266,39 +264,9 @@ class BeamSolver:
 
         return K_geo_global
 
-    def compute_buckling_mode_forces(self, mode_displacements: np.ndarray) -> Dict[int, np.ndarray]:
-        """Compute internal forces for a given buckling mode displacement vector."""
-        displacements_flat = mode_displacements.flatten()
-        element_forces = {}
-
-        for elem_idx, (node1_id, node2_id) in enumerate(self.beam.elements):
-            node1_idx = np.where(self.beam.nodes[:, 3] == node1_id)[0][0]
-            node2_idx = np.where(self.beam.nodes[:, 3] == node2_id)[0][0]
-            node1_coords = self.beam.nodes[node1_idx, :3]
-            node2_coords = self.beam.nodes[node2_idx, :3]
-
-            L = np.linalg.norm(node2_coords - node1_coords)
-            k_local = fu.local_elastic_stiffness_matrix_3D_beam(
-                self.beam.E, self.beam.nu, self.beam.A, L, self.beam.Iy, self.beam.Iz, self.beam.J
-            )
-            gamma = rotation_matrix_3D(*node1_coords, *node2_coords)
-            T = transformation_matrix_3D(gamma)
-
-            dofs = np.array([
-                node1_idx * 6, node1_idx * 6 + 1, node1_idx * 6 + 2, node1_idx * 6 + 3, node1_idx * 6 + 4, node1_idx * 6 + 5,
-                node2_idx * 6, node2_idx * 6 + 1, node2_idx * 6 + 2, node2_idx * 6 + 3, node2_idx * 6 + 4, node2_idx * 6 + 5
-            ])
-            disp_elem = displacements_flat[dofs]
-            disp_local = T @ disp_elem
-            forces_local = k_local @ disp_local
-            element_forces[elem_idx] = forces_local
-
-        return element_forces
-
-    def solve_buckling(self) -> Tuple[np.ndarray, np.ndarray, Dict[int, Dict[int, np.ndarray]]]:
-        """Solve for buckling eigenvalues, eigenvectors, and corresponding internal forces."""
+    def solve_buckling(self) -> Tuple[np.ndarray, np.ndarray]:
         if self.internal_forces is None:
-            self.solve()  # Ensure elastic solution is computed
+            self.solve()
 
         K_elastic = self.build_stiffness_matrix()
         K_geo = self.build_geometric_stiffness_matrix()
@@ -327,15 +295,5 @@ class BeamSolver:
         filtered_eigvals = filtered_eigvals[sorted_inds]
         filtered_eigvecs = filtered_eigvecs[:, sorted_inds]
 
-        # Compute forces for each buckling mode
-        n_nodes = self.beam.nodes.shape[0]
-        buckling_forces = {}
-        full_eigvecs = np.zeros((n_dofs, filtered_eigvals.size))
-        full_eigvecs[unknown_dofs, :] = filtered_eigvecs  # Fill free DOFs, fixed DOFs remain 0
-        for mode_idx in range(min(3, filtered_eigvals.size)):  # Limit to first 3 modes
-            mode_displacements = full_eigvecs[:, mode_idx].reshape(n_nodes, 6)
-            buckling_forces[mode_idx] = self.compute_buckling_mode_forces(mode_displacements)
-
-        self.buckling_forces = buckling_forces
-        return filtered_eigvals, full_eigvecs, buckling_forces
+        return filtered_eigvals, filtered_eigvecs
 
