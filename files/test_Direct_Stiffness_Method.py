@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from Direct_Stiffness_Methodd import BeamComponent, BoundaryCondition, BeamSolver
+from Direct_Stiffness_Method import BeamComponent, BoundaryCondition, BeamSolver
 import functions as fu
 from unittest.mock import patch
 
@@ -133,5 +133,3 @@ def test_solve_buckling(simple_beam, simple_bc):
     assert isinstance(buckling_forces, dict)
     assert 0 in buckling_forces  # At least first mode
 
-# Run with coverage
-# pytest --cov=Direct_Stiffness_Methodd --cov-report=term-missing tests/
