@@ -32,6 +32,9 @@ def test_beamcomponent_invalid_nodes():
         BeamComponent([1, 2, 3], np.array([[0, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
     with pytest.raises(ValueError, match="Nodes must be a 2D array with shape \(n_nodes, 4\), got \(3,\)\."):
         BeamComponent(np.array([1, 2, 3]), np.array([[0, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+    # New: Test wrong number of columns (Line 35)
+    with pytest.raises(ValueError, match="Nodes must be a 2D array with shape \(n_nodes, 4\), got \(2, 3\)\."):
+        BeamComponent(np.array([[0, 0, 0], [1, 0, 0]]), np.array([[0, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
 
 def test_beamcomponent_invalid_elements():
     nodes = np.array([[0.0, 0.0, 0.0, 0], [1.0, 0.0, 0.0, 1]])
@@ -39,6 +42,11 @@ def test_beamcomponent_invalid_elements():
         BeamComponent(nodes, [0, 1], 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
     with pytest.raises(ValueError, match="Element 0 has invalid node1_id 2"):
         BeamComponent(nodes, np.array([[2, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+    # New: Test non-integer node IDs (Line 45)
+    with pytest.raises(ValueError, match="Element 0 has invalid node1_id 1\.5"):
+        BeamComponent(nodes, np.array([[1.5, 1]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
+    with pytest.raises(ValueError, match="Element 0 has invalid node2_id 0\.5"):
+        BeamComponent(nodes, np.array([[0, 0.5]]), 200e9, 0.3, 0.01, 1e-4, 1e-4, 2e-4)
 
 def test_beamcomponent_invalid_material_properties():
     nodes = np.array([[0.0, 0.0, 0.0, 0], [1.0, 0.0, 0.0, 1]])
@@ -49,6 +57,13 @@ def test_beamcomponent_invalid_material_properties():
         BeamComponent(nodes, elements, 200e9, 1.0, 0.01, 1e-4, 1e-4, 2e-4)
     with pytest.raises(ValueError, match="Cross-sectional area"):
         BeamComponent(nodes, elements, 200e9, 0.3, -0.01, 1e-4, 1e-4, 2e-4)
+    # New: Test Iy, Iz, J (Lines 55, 57, 59)
+    with pytest.raises(ValueError, match="Moment of inertia about y-axis"):
+        BeamComponent(nodes, elements, 200e9, 0.3, 0.01, -1e-4, 1e-4, 2e-4)
+    with pytest.raises(ValueError, match="Moment of inertia about z-axis"):
+        BeamComponent(nodes, elements, 200e9, 0.3, 0.01, 1e-4, -1e-4, 2e-4)
+    with pytest.raises(ValueError, match="Polar moment of inertia"):
+        BeamComponent(nodes, elements, 200e9, 0.3, 0.01, 1e-4, 1e-4, -2e-4)
 
 # BoundaryCondition Tests
 def test_boundarycondition_init_valid(simple_bc):
@@ -70,6 +85,9 @@ def test_boundarycondition_apply_load(simple_bc):
     assert simple_bc.applied_loads[1] == (100.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     with pytest.raises(ValueError, match="Loads for node 1 must be a tuple of 6 values"):
         simple_bc.apply_load(1, (100.0, 0.0))
+    # New: Test invalid load length (Line 86)
+    with pytest.raises(ValueError, match="Loads for node 1 must be a tuple of 6 values"):
+        simple_bc.apply_load(1, (1.0, 2.0, 3.0, 4.0, 5.0))  # 5 values
 
 def test_boundarycondition_supports(simple_bc):
     simple_bc.add_fixed_support(1)
@@ -123,12 +141,28 @@ def test_build_geometric_stiffness_matrix_raises(simple_beam, simple_bc):
     with pytest.raises(ValueError, match="Must run solve\(\) first to compute internal forces for buckling analysis\."):
         solver.build_geometric_stiffness_matrix()
 
+def test_build_geometric_stiffness_matrix_after_solve(simple_beam, simple_bc):
+    solver = BeamSolver(simple_beam, simple_bc)
+    simple_bc.apply_load(1, (1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    solver.solve()  # Sets internal_forces
+    K_geo = solver.build_geometric_stiffness_matrix()
+    assert K_geo.shape == (12, 12)  # 2 nodes * 6 DOFs
+    assert np.any(K_geo != 0)  # Should have non-zero entries
+
+def test_display_results(simple_beam, simple_bc, capsys):
+    solver = BeamSolver(simple_beam, simple_bc)
+    simple_bc.apply_load(1, (1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    displacements, reactions = solver.solve()
+    solver.display_results(displacements, reactions)
+    captured = capsys.readouterr()
+    assert "Node 0 Displacements" in captured.out
+    assert "Node 1 Reactions" in captured.out
+
 def test_solve_buckling(simple_beam, simple_bc):
     solver = BeamSolver(simple_beam, simple_bc)
     simple_bc.apply_load(1, (-1000.0, 0.0, 0.0, 0.0, 0.0, 0.0))  # Compressive load
     solver.solve()  # Compute internal forces first
     eigvals, eigvecs, buckling_forces = solver.solve_buckling()
-    # Relax the assertion: check if eigvals is an array, allow zero length if no modes found
     assert isinstance(eigvals, np.ndarray)
     assert eigvecs.shape[0] == 12  # Total DOFs (2 nodes * 6)
     assert isinstance(buckling_forces, dict)
